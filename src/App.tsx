@@ -861,6 +861,16 @@ export default function App() {
                       <span className="hidden sm:inline">Dark</span>
                     </button>
                     <button
+                      onClick={() => setBgMode('light')}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
+                        bgMode === 'light' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'
+                      }`}
+                      title="White Background"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">White</span>
+                    </button>
+                    <button
                       onClick={() => setBgMode('navy')}
                       className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                         bgMode === 'navy' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-white'

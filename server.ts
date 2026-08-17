@@ -230,25 +230,42 @@ Return ONLY the enhanced prompt text (no conversational fluff).`;
       const ai = getGeminiClient(customGeminiKey);
       let parsedSpecs: any = null;
 
-      const analysisPrompt = `Carefully analyze the attached reference image:
-1. Identify the EXACT SUBJECT and OPTICAL/GRAPHIC PHENOMENON (e.g. "Optical Lens Flare / Horizontal Light Streak with Glowing Core", "Neon Glow Ring", "3D Glossy Badge / Seal", "Pinned Sticky Note", "Volumetric Spotlight Cone", "Abstract Vector Waves").
-2. DO NOT hallucinate or assume a Certificate / Border Frame unless the image is literally a certificate border frame. If it is a lens flare or light streak, classify it strictly as "lens_flare".
-3. Check the primary optical colors, core glow color, secondary streak colors, and dark falloff colors.
-4. Provide 4 distinct, gorgeous color variations inspired directly by this subject.
-5. Ensure background is 100% transparent (alpha = 0).
+      const analysisPrompt = `Carefully analyze the attached reference image and identify what it ACTUALLY depicts:
+
+1. Identify the EXACT visual subject. Examples of possible subjects:
+   - "Technology Network Grid with Diamond Shapes and Glowing Nodes"
+   - "Optical Lens Flare / Horizontal Light Streak"
+   - "Abstract Geometric Waves / Curved Lines"
+   - "Neon Glow Ring / Circle Effect"
+   - "3D Glossy Badge / Seal / Medal"
+   - "Pinned Sticky Note / Memo Paper"
+   - "Certificate Border Frame"
+   - "Volumetric Spotlight Cone"
+   - "Particle Scatter / Bokeh Dots"
+   - "Hexagonal Tech Pattern / Honeycomb Grid"
+   - "Circuit Board / Digital Network Lines"
+   - "Abstract Flowing Ribbons / Swirls"
+
+2. DO NOT default to "lens_flare" unless the image is literally a lens flare or light streak.
+3. If the image shows interconnected shapes (diamonds, hexagons, squares) with nodes/dots, classify patternType as "network_grid".
+4. If the image shows abstract curves, waves, or flowing lines, classify patternType as "wave_pattern".
+5. If the image shows scattered particles, dots, confetti, or bokeh, classify patternType as "particle_scatter".
+6. Check the primary colors, secondary accent colors, and dark/shadow colors accurately.
+7. Provide 4 distinct, gorgeous color variations inspired directly by this subject.
+8. Ensure background is 100% transparent (alpha = 0).
 
 Return strictly valid JSON:
 {
-  "themeName": "Precise name describing the exact subject (e.g. Optical Lens Flare & Horizontal Light Streak)",
-  "assetType": "lens_flare" (or "spotlight", "badge", "sticky_note", "frame", "vector_graphic"),
+  "themeName": "Precise name describing the exact visual subject",
+  "assetType": one of: "network_grid", "lens_flare", "wave_pattern", "particle_scatter", "hexagon_grid", "spotlight", "badge", "sticky_note", "frame", "abstract_geometric",
   "variations": [
     {
       "name": "Creative colorway name 1",
       "primaryColor": "#HEX",
       "secondaryColor": "#HEX",
       "darkColor": "#HEX",
-      "styleDesc": "Short description of visual attributes",
-      "patternType": "lens_flare"
+      "styleDesc": "Short description of visual attributes and shapes present",
+      "patternType": "SAME as assetType above - must match the detected pattern"
     },
     {
       "name": "Creative colorway name 2",
@@ -256,7 +273,7 @@ Return strictly valid JSON:
       "secondaryColor": "#HEX",
       "darkColor": "#HEX",
       "styleDesc": "Short description of visual attributes",
-      "patternType": "lens_flare"
+      "patternType": "SAME as assetType above"
     },
     {
       "name": "Creative colorway name 3",
@@ -264,7 +281,7 @@ Return strictly valid JSON:
       "secondaryColor": "#HEX",
       "darkColor": "#HEX",
       "styleDesc": "Short description of visual attributes",
-      "patternType": "lens_flare"
+      "patternType": "SAME as assetType above"
     },
     {
       "name": "Creative colorway name 4",
@@ -272,7 +289,7 @@ Return strictly valid JSON:
       "secondaryColor": "#HEX",
       "darkColor": "#HEX",
       "styleDesc": "Short description of visual attributes",
-      "patternType": "lens_flare"
+      "patternType": "SAME as assetType above"
     }
   ]
 }`;

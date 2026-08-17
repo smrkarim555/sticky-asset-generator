@@ -48,15 +48,270 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
 
     const descLower = ((item.name || '') + ' ' + (item.styleDesc || '') + ' ' + (item.patternType || '') + ' ' + assetType).toLowerCase();
 
+    // Pattern detection - ORDER MATTERS: specific patterns first, lens_flare last
+    const isNetworkGrid = descLower.includes('network') || descLower.includes('grid') || descLower.includes('diamond') || descLower.includes('circuit') || descLower.includes('connect') || descLower.includes('node') || descLower.includes('tech_pattern') || descLower.includes('network_grid');
+    const isHexGrid = descLower.includes('hexagon') || descLower.includes('honeycomb') || descLower.includes('hexagon_grid');
+    const isWavePattern = descLower.includes('wave') || descLower.includes('curve') || descLower.includes('ribbon') || descLower.includes('swirl') || descLower.includes('flow') || descLower.includes('wave_pattern');
+    const isParticleScatter = descLower.includes('particle') || descLower.includes('scatter') || descLower.includes('bokeh') || descLower.includes('confetti') || descLower.includes('dust') || descLower.includes('particle_scatter');
+    const isAbstractGeo = descLower.includes('abstract_geometric') || descLower.includes('geometric') || descLower.includes('polygon');
     const isFlare = descLower.includes('flare') || descLower.includes('lens') || descLower.includes('streak') || descLower.includes('anamorphic') || descLower.includes('beam') || descLower.includes('laser') || descLower.includes('glow_streak') || descLower.includes('spark');
     const isFrame = descLower.includes('frame') || descLower.includes('border') || descLower.includes('certificate') || descLower.includes('diploma');
     const isNote = descLower.includes('sticky') || descLower.includes('note') || descLower.includes('memo') || descLower.includes('paper');
     const isBadge = descLower.includes('badge') || descLower.includes('shield') || descLower.includes('seal') || descLower.includes('medal') || descLower.includes('guarantee');
     const isSpotlight = descLower.includes('spotlight') || descLower.includes('shaft') || descLower.includes('conical');
 
-    if (isFlare || (!isFrame && !isNote && !isBadge && !isSpotlight)) {
+    if (isNetworkGrid || isHexGrid || isAbstractGeo) {
       // =========================================================================
-      // 1. RENDER OPTICAL LENS FLARE / ANAMORPHIC HORIZONTAL LIGHT STREAK (IMAGE 1 STYLE)
+      // RENDER TECHNOLOGY NETWORK GRID (Diamond/Hexagon shapes + Glowing Nodes)
+      // =========================================================================
+      ctx.save();
+
+      const gridType = isHexGrid ? 'hex' : 'diamond';
+      const spacingX = isHexGrid ? 220 : 200;
+      const spacingY = isHexGrid ? 190 : 180;
+      const shapeSize = isHexGrid ? 70 : 60;
+
+      // Offset for variation uniqueness
+      const offsetX = (idx * 37) % 60;
+      const offsetY = (idx * 23) % 50;
+
+      ctx.globalCompositeOperation = 'lighter';
+
+      const nodePositions = [];
+
+      // Calculate all node positions - concentrated toward bottom half (like reference)
+      for (let row = -2; row < Math.ceil(height / spacingY) + 2; row++) {
+        for (let col = -2; col < Math.ceil(width / spacingX) + 2; col++) {
+          let nx = col * spacingX + offsetX + (row % 2 === 0 ? spacingX / 2 : 0);
+          let ny = row * spacingY + offsetY;
+
+          // Density increases toward bottom (matching reference image style)
+          const verticalFactor = ny / height;
+          if (verticalFactor < 0.3 && random() > 0.25) continue;
+          if (verticalFactor < 0.5 && random() > 0.55) continue;
+
+          // Random offset for organic feel
+          nx += (random() - 0.5) * 40;
+          ny += (random() - 0.5) * 35;
+
+          if (nx > -100 && nx < width + 100 && ny > -100 && ny < height + 100) {
+            const nodeAlpha = Math.min(1.0, 0.15 + verticalFactor * 0.85);
+            nodePositions.push({ x: nx, y: ny, alpha: nodeAlpha, size: shapeSize * (0.5 + random() * 0.8) });
+          }
+        }
+      }
+
+      // Draw connection lines between nearby nodes
+      for (let i = 0; i < nodePositions.length; i++) {
+        for (let j = i + 1; j < nodePositions.length; j++) {
+          const dx = nodePositions[j].x - nodePositions[i].x;
+          const dy = nodePositions[j].y - nodePositions[i].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+
+          if (dist < spacingX * 1.8 && dist > 30) {
+            const lineAlpha = Math.max(0.03, (1 - dist / (spacingX * 1.8)) * 0.4 * Math.min(nodePositions[i].alpha, nodePositions[j].alpha));
+            ctx.beginPath();
+            ctx.moveTo(nodePositions[i].x, nodePositions[i].y);
+            ctx.lineTo(nodePositions[j].x, nodePositions[j].y);
+            ctx.strokeStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${lineAlpha})`;
+            ctx.lineWidth = 1.5 + random() * 1.5;
+            ctx.stroke();
+          }
+        }
+      }
+
+      // Draw shapes at each node
+      for (const node of nodePositions) {
+        const { x, y, alpha, size } = node;
+
+        if (gridType === 'diamond') {
+          // Diamond / Rhombus shape (rotated square)
+          ctx.save();
+          ctx.translate(x, y);
+          ctx.rotate(Math.PI / 4);
+
+          ctx.beginPath();
+          ctx.rect(-size / 2, -size / 2, size, size);
+          ctx.strokeStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${alpha * 0.6})`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Some diamonds have a second inner diamond
+          if (random() > 0.5) {
+            const innerSize = size * 0.6;
+            ctx.beginPath();
+            ctx.rect(-innerSize / 2, -innerSize / 2, innerSize, innerSize);
+            ctx.strokeStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${alpha * 0.35})`;
+            ctx.lineWidth = 1;
+            ctx.stroke();
+          }
+
+          ctx.restore();
+        } else {
+          // Hexagon shape
+          ctx.beginPath();
+          for (let h = 0; h < 6; h++) {
+            const angle = (Math.PI / 3) * h - Math.PI / 6;
+            const hx = x + Math.cos(angle) * size / 2;
+            const hy = y + Math.sin(angle) * size / 2;
+            if (h === 0) ctx.moveTo(hx, hy);
+            else ctx.lineTo(hx, hy);
+          }
+          ctx.closePath();
+          ctx.strokeStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${alpha * 0.5})`;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        // Glowing node dot at center
+        const dotSize = 3 + random() * 10;
+        const hasGlow = random() > 0.35;
+
+        if (hasGlow) {
+          // Outer glow halo
+          const glowGrad = ctx.createRadialGradient(x, y, 0, x, y, dotSize * 4);
+          glowGrad.addColorStop(0, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${alpha * 0.6})`);
+          glowGrad.addColorStop(0.3, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${alpha * 0.25})`);
+          glowGrad.addColorStop(1, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0)`);
+          ctx.fillStyle = glowGrad;
+          ctx.beginPath();
+          ctx.arc(x, y, dotSize * 4, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // Core dot
+        const coreGrad = ctx.createRadialGradient(x, y, 0, x, y, dotSize);
+        coreGrad.addColorStop(0, `rgba(${sRgb.r}, ${sRgb.g}, ${sRgb.b}, ${alpha * 0.95})`);
+        coreGrad.addColorStop(0.5, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${alpha * 0.8})`);
+        coreGrad.addColorStop(1, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0)`);
+        ctx.fillStyle = coreGrad;
+        ctx.beginPath();
+        ctx.arc(x, y, dotSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Scatter some tiny particles/dots for ambiance
+      for (let p = 0; p < 120; p++) {
+        const px = random() * width;
+        const py = random() * height;
+        const pr = 1 + random() * 3;
+        const pa = 0.1 + random() * 0.5 * (py / height);
+
+        ctx.fillStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${pa})`;
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+    } else if (isWavePattern) {
+      // =========================================================================
+      // RENDER ABSTRACT WAVE PATTERN (Flowing curves, ribbons, swirls)
+      // =========================================================================
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      const numWaves = 6 + idx * 2;
+
+      for (let w = 0; w < numWaves; w++) {
+        const waveY = height * 0.15 + (w / numWaves) * height * 0.7;
+        const amplitude = 80 + random() * 200;
+        const frequency = 0.002 + random() * 0.004;
+        const phase = random() * Math.PI * 2 + idx * 0.8;
+        const thickness = 2 + random() * 6;
+        const waveAlpha = 0.15 + random() * 0.45;
+
+        ctx.beginPath();
+        for (let x = 0; x <= width; x += 3) {
+          const y = waveY + Math.sin(x * frequency + phase) * amplitude + Math.cos(x * frequency * 0.5 + phase * 1.3) * amplitude * 0.3;
+          if (x === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.strokeStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${waveAlpha})`;
+        ctx.lineWidth = thickness;
+        ctx.stroke();
+
+        // Add glow to some waves
+        if (random() > 0.4) {
+          ctx.strokeStyle = `rgba(${sRgb.r}, ${sRgb.g}, ${sRgb.b}, ${waveAlpha * 0.3})`;
+          ctx.lineWidth = thickness * 4;
+          ctx.stroke();
+        }
+      }
+
+      // Add glowing intersection dots
+      for (let d = 0; d < 40; d++) {
+        const dx = random() * width;
+        const dy = random() * height;
+        const dr = 3 + random() * 12;
+
+        const dotGlow = ctx.createRadialGradient(dx, dy, 0, dx, dy, dr * 3);
+        dotGlow.addColorStop(0, `rgba(${sRgb.r}, ${sRgb.g}, ${sRgb.b}, 0.8)`);
+        dotGlow.addColorStop(0.4, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.3)`);
+        dotGlow.addColorStop(1, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0)`);
+        ctx.fillStyle = dotGlow;
+        ctx.beginPath();
+        ctx.arc(dx, dy, dr * 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+    } else if (isParticleScatter) {
+      // =========================================================================
+      // RENDER PARTICLE SCATTER / BOKEH (Scattered glowing particles and dots)
+      // =========================================================================
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      const numParticles = 180 + idx * 30;
+
+      for (let p = 0; p < numParticles; p++) {
+        const px = random() * width;
+        const py = random() * height;
+        const pSize = 2 + random() * 25;
+        const pa = 0.1 + random() * 0.7;
+
+        const bokehGrad = ctx.createRadialGradient(px, py, 0, px, py, pSize);
+        const useSecondary = random() > 0.6;
+        const cR = useSecondary ? sRgb.r : pRgb.r;
+        const cG = useSecondary ? sRgb.g : pRgb.g;
+        const cB = useSecondary ? sRgb.b : pRgb.b;
+
+        bokehGrad.addColorStop(0, `rgba(${cR}, ${cG}, ${cB}, ${pa})`);
+        bokehGrad.addColorStop(0.6, `rgba(${cR}, ${cG}, ${cB}, ${pa * 0.5})`);
+        bokehGrad.addColorStop(1, `rgba(${cR}, ${cG}, ${cB}, 0)`);
+
+        ctx.fillStyle = bokehGrad;
+        ctx.beginPath();
+        ctx.arc(px, py, pSize, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (random() > 0.7) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${pa * 0.8})`;
+          ctx.beginPath();
+          ctx.arc(px, py, pSize * 0.15, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Tiny dust specks
+      for (let d = 0; d < 300; d++) {
+        const dx = random() * width;
+        const dy = random() * height;
+        const dr = 0.5 + random() * 2;
+        ctx.fillStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${0.2 + random() * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(dx, dy, dr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+    } else if (isFlare) {
+      // =========================================================================
+      // RENDER OPTICAL LENS FLARE / ANAMORPHIC HORIZONTAL LIGHT STREAK
       // =========================================================================
       const cx = width / 2;
       const cy = height / 2;
@@ -107,7 +362,7 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       ctx.arc(cx, cy, 550, 0, Math.PI * 2);
       ctx.fill();
 
-      // 4. Multi-Point Diffraction Starburst Rays (Diamond Spikes)
+      // 4. Starburst Rays
       const numRays = 8;
       for (let r = 0; r < numRays; r++) {
         const angle = (r * Math.PI) / numRays + (idx * 0.1);
@@ -132,7 +387,7 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
         ctx.restore();
       }
 
-      // 5. Intense White-Hot Core Flare Center
+      // 5. Core Flare Center
       const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 140);
       coreGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
       coreGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.95)');
@@ -144,14 +399,14 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       ctx.arc(cx, cy, 140, 0, Math.PI * 2);
       ctx.fill();
 
-      // 6. Secondary Optical Ring Halo
+      // 6. Ring Halo
       ctx.beginPath();
       ctx.arc(cx, cy, 320, 0, Math.PI * 2);
       ctx.lineWidth = 3;
       ctx.strokeStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.25)`;
       ctx.stroke();
 
-      // 7. Subtle Bokeh & Stardust Particles
+      // 7. Stardust Particles
       for (let p = 0; p < 45; p++) {
         const px = cx + (random() - 0.5) * 1600;
         const py = cy + (random() - 0.5) * 280;
@@ -168,7 +423,7 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
 
     } else if (isFrame) {
       // =========================================================================
-      // 2. RENDER LUXURY BORDER FRAME (ONLY IF EXPLICITLY DETECTED AS FRAME)
+      // RENDER LUXURY BORDER FRAME
       // =========================================================================
       const margin = 90;
       const cornerSize = 700;
@@ -182,11 +437,9 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       ctx.strokeStyle = borderGrad;
       ctx.strokeRect(margin, margin, width - margin * 2, height - margin * 2);
 
-      // Inner thin pinstripe
       ctx.lineWidth = 4;
       ctx.strokeRect(margin + 25, margin + 25, width - (margin + 25) * 2, height - (margin + 25) * 2);
 
-      // Corner vector accents
       function drawCorner(cx, cy, angle) {
         ctx.save();
         ctx.translate(cx, cy);
@@ -217,7 +470,7 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
 
     } else if (isNote) {
       // =========================================================================
-      // 3. RENDER PINNED STICKY NOTE
+      // RENDER PINNED STICKY NOTE
       // =========================================================================
       const noteW = 1600;
       const noteH = 1600;
@@ -240,7 +493,6 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       ctx.fillStyle = noteGrad;
       ctx.fill();
 
-      // Pin
       ctx.beginPath();
       ctx.arc(width / 2, ny + 70, 42, 0, Math.PI * 2);
       ctx.fillStyle = '#E63946';
@@ -249,7 +501,7 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
 
     } else if (isBadge) {
       // =========================================================================
-      // 4. RENDER 3D ROSETTE GUARANTEE BADGE
+      // RENDER 3D ROSETTE GUARANTEE BADGE
       // =========================================================================
       const cx = width / 2;
       const cy = height / 2;
@@ -275,9 +527,9 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       ctx.fill();
       ctx.restore();
 
-    } else {
+    } else if (isSpotlight) {
       // =========================================================================
-      // 5. RENDER VOLUMETRIC SPOTLIGHT
+      // RENDER VOLUMETRIC SPOTLIGHT
       // =========================================================================
       const targetX = width * 0.50;
       const targetY = height * 0.05;
@@ -301,6 +553,46 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       ctx.closePath();
       ctx.fillStyle = grad;
       ctx.fill();
+      ctx.restore();
+
+    } else {
+      // =========================================================================
+      // FALLBACK: Generic abstract graphic (NOT lens flare by default)
+      // =========================================================================
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (let i = 0; i < 15; i++) {
+        const cx = random() * width;
+        const cy = random() * height;
+        const cr = 50 + random() * 300;
+        const ca = 0.1 + random() * 0.3;
+
+        ctx.beginPath();
+        ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${ca})`;
+        ctx.lineWidth = 1 + random() * 3;
+        ctx.stroke();
+
+        const gGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, cr * 0.3);
+        gGrad.addColorStop(0, `rgba(${sRgb.r}, ${sRgb.g}, ${sRgb.b}, ${ca * 0.8})`);
+        gGrad.addColorStop(1, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0)`);
+        ctx.fillStyle = gGrad;
+        ctx.beginPath();
+        ctx.arc(cx, cy, cr * 0.3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      for (let p = 0; p < 200; p++) {
+        const px = random() * width;
+        const py = random() * height;
+        const pr = 1 + random() * 5;
+        ctx.fillStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, ${0.15 + random() * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
       ctx.restore();
     }
 
