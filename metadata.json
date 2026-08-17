@@ -1,0 +1,6 @@
+{
+  "name": "4K Transparent PNG Gemini AI Graphic Generator Studio",
+  "description": "High-resolution 3840x2160 4K transparent PNG graphics studio with Gemini API image attachment support. Upload or attach any reference image to analyze its style with Gemini AI and generate 4 matching 4K transparent PNG variations with zero errors.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

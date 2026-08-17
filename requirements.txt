@@ -1,0 +1,8 @@
+pycairo
+cairosvg
+Pillow
+numpy
+scipy
+scikit-image
+opencv-python
+colour
