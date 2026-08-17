@@ -20,7 +20,7 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
     const canvas = createCanvas(width, height);
     const ctx = canvas.getContext('2d');
 
-    // Clear 100% transparent canvas
+    // 100% Clear transparent canvas (zero background shadow / zero black boxes)
     ctx.clearRect(0, 0, width, height);
 
     let seed = (idx + 1) * 777333 + (item.name ? item.name.length * 1234 : 4567);
@@ -29,9 +29,9 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       return x - Math.floor(x);
     }
 
-    const colorMain = item.primaryColor || '#0A1931';
-    const colorLight = item.secondaryColor || '#D4AF37';
-    const colorDark = item.darkColor || '#050D1A';
+    const colorMain = item.primaryColor || '#00D2FF';
+    const colorLight = item.secondaryColor || '#FFFFFF';
+    const colorDark = item.darkColor || '#0044AA';
 
     function hexToRgb(hex) {
       const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -39,152 +39,185 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
         r: parseInt(result[1], 16),
         g: parseInt(result[2], 16),
         b: parseInt(result[3], 16)
-      } : { r: 10, g: 25, b: 49 };
+      } : { r: 0, g: 210, b: 255 };
     }
 
     const pRgb = hexToRgb(colorMain);
     const sRgb = hexToRgb(colorLight);
     const dRgb = hexToRgb(colorDark);
 
-    const descLower = ((item.name || '') + ' ' + (item.styleDesc || '') + ' ' + assetType).toLowerCase();
-    const isFrame = descLower.includes('frame') || descLower.includes('border') || descLower.includes('certificate') || descLower.includes('diploma') || descLower.includes('corner');
+    const descLower = ((item.name || '') + ' ' + (item.styleDesc || '') + ' ' + (item.patternType || '') + ' ' + assetType).toLowerCase();
+
+    const isFlare = descLower.includes('flare') || descLower.includes('lens') || descLower.includes('streak') || descLower.includes('anamorphic') || descLower.includes('beam') || descLower.includes('laser') || descLower.includes('glow_streak') || descLower.includes('spark');
+    const isFrame = descLower.includes('frame') || descLower.includes('border') || descLower.includes('certificate') || descLower.includes('diploma');
     const isNote = descLower.includes('sticky') || descLower.includes('note') || descLower.includes('memo') || descLower.includes('paper');
     const isBadge = descLower.includes('badge') || descLower.includes('shield') || descLower.includes('seal') || descLower.includes('medal') || descLower.includes('guarantee');
-    const isSpotlight = descLower.includes('spotlight') || descLower.includes('beam') || descLower.includes('shaft') || descLower.includes('light');
+    const isSpotlight = descLower.includes('spotlight') || descLower.includes('shaft') || descLower.includes('conical');
 
-    if (isFrame || (!isNote && !isBadge && !isSpotlight)) {
+    if (isFlare || (!isFrame && !isNote && !isBadge && !isSpotlight)) {
       // =========================================================================
-      // 1. RENDER LUXURY CERTIFICATE / DIPLOMA ORNATE BORDER FRAME (WITH TRANSPARENT CENTER)
+      // 1. RENDER OPTICAL LENS FLARE / ANAMORPHIC HORIZONTAL LIGHT STREAK (IMAGE 1 STYLE)
       // =========================================================================
-      
-      const margin = 80;
-      const cornerSize = 750;
-      const goldTrim = 28;
+      const cx = width / 2;
+      const cy = height / 2;
 
-      // Draw Outer Gold Border
       ctx.save();
-      ctx.lineWidth = 14;
-      const borderGrad = ctx.createLinearGradient(0, 0, width, height);
-      borderGrad.addColorStop(0, '#FFE89E');
-      borderGrad.addColorStop(0.3, '#D4AF37');
-      borderGrad.addColorStop(0.7, '#FFF2B2');
-      borderGrad.addColorStop(1, '#AA8010');
-      ctx.strokeStyle = borderGrad;
-      ctx.strokeRect(margin, margin, width - margin * 2, height - margin * 2);
+      ctx.globalCompositeOperation = 'screen';
 
-      // Inner thin gold pinstripe
-      ctx.lineWidth = 4;
-      ctx.strokeRect(margin + 30, margin + 30, width - (margin + 30) * 2, height - (margin + 30) * 2);
-      ctx.restore();
+      // 1. Horizontal Anamorphic Streak Line (Broad Soft Glow)
+      const streakGradBroad = ctx.createLinearGradient(0, cy, width, cy);
+      streakGradBroad.addColorStop(0, 'rgba(0,0,0,0)');
+      streakGradBroad.addColorStop(0.15, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.05)`);
+      streakGradBroad.addColorStop(0.4, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.6)`);
+      streakGradBroad.addColorStop(0.5, `rgba(255, 255, 255, 0.95)`);
+      streakGradBroad.addColorStop(0.6, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.6)`);
+      streakGradBroad.addColorStop(0.85, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.05)`);
+      streakGradBroad.addColorStop(1, 'rgba(0,0,0,0)');
 
-      // Function to render 4 Ornate Curved Corner Ribbons & Metallic Accents
-      function drawCornerAccents(cx, cy, angle) {
+      ctx.fillStyle = streakGradBroad;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, width * 0.48, 18, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. Razor Sharp Core Anamorphic Needle Streak
+      const streakGradSharp = ctx.createLinearGradient(cx - width * 0.42, cy, cx + width * 0.42, cy);
+      streakGradSharp.addColorStop(0, 'rgba(255,255,255,0)');
+      streakGradSharp.addColorStop(0.3, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.5)`);
+      streakGradSharp.addColorStop(0.48, 'rgba(255, 255, 255, 0.98)');
+      streakGradSharp.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
+      streakGradSharp.addColorStop(0.52, 'rgba(255, 255, 255, 0.98)');
+      streakGradSharp.addColorStop(0.7, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.5)`);
+      streakGradSharp.addColorStop(1, 'rgba(255,255,255,0)');
+
+      ctx.fillStyle = streakGradSharp;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, width * 0.40, 5, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3. Central Soft Radial Color Bloom
+      const bloomGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 550);
+      bloomGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      bloomGrad.addColorStop(0.12, `rgba(${sRgb.r}, ${sRgb.g}, ${sRgb.b}, 0.8)`);
+      bloomGrad.addColorStop(0.35, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.45)`);
+      bloomGrad.addColorStop(0.7, `rgba(${dRgb.r}, ${dRgb.g}, ${dRgb.b}, 0.1)`);
+      bloomGrad.addColorStop(1, 'rgba(0,0,0,0)');
+
+      ctx.fillStyle = bloomGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 550, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 4. Multi-Point Diffraction Starburst Rays (Diamond Spikes)
+      const numRays = 8;
+      for (let r = 0; r < numRays; r++) {
+        const angle = (r * Math.PI) / numRays + (idx * 0.1);
+        const rayLen = r % 2 === 0 ? 600 : 380;
+        const rayThickness = r % 2 === 0 ? 12 : 6;
+
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(angle);
 
-        // 1. Outer Deep Accent Shape (Curved Multi-layered Ribbon Wing)
+        const rayGrad = ctx.createLinearGradient(-rayLen, 0, rayLen, 0);
+        rayGrad.addColorStop(0, 'rgba(255,255,255,0)');
+        rayGrad.addColorStop(0.35, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.4)`);
+        rayGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.9)');
+        rayGrad.addColorStop(0.65, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.4)`);
+        rayGrad.addColorStop(1, 'rgba(255,255,255,0)');
+
+        ctx.fillStyle = rayGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rayLen, rayThickness, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 5. Intense White-Hot Core Flare Center
+      const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, 140);
+      coreGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
+      coreGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.95)');
+      coreGrad.addColorStop(0.65, `rgba(${sRgb.r}, ${sRgb.g}, ${sRgb.b}, 0.7)`);
+      coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, 140, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 6. Secondary Optical Ring Halo
+      ctx.beginPath();
+      ctx.arc(cx, cy, 320, 0, Math.PI * 2);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.25)`;
+      ctx.stroke();
+
+      // 7. Subtle Bokeh & Stardust Particles
+      for (let p = 0; p < 45; p++) {
+        const px = cx + (random() - 0.5) * 1600;
+        const py = cy + (random() - 0.5) * 280;
+        const pr = 1.5 + random() * 4.5;
+        const pa = 0.2 + random() * 0.6;
+
+        ctx.fillStyle = `rgba(${random() > 0.4 ? '255,255,255' : `${pRgb.r},${pRgb.g},${pRgb.b}`}, ${pa})`;
+        ctx.beginPath();
+        ctx.arc(px, py, pr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+    } else if (isFrame) {
+      // =========================================================================
+      // 2. RENDER LUXURY BORDER FRAME (ONLY IF EXPLICITLY DETECTED AS FRAME)
+      // =========================================================================
+      const margin = 90;
+      const cornerSize = 700;
+
+      ctx.save();
+      ctx.lineWidth = 14;
+      const borderGrad = ctx.createLinearGradient(0, 0, width, height);
+      borderGrad.addColorStop(0, colorLight);
+      borderGrad.addColorStop(0.5, colorMain);
+      borderGrad.addColorStop(1, colorDark);
+      ctx.strokeStyle = borderGrad;
+      ctx.strokeRect(margin, margin, width - margin * 2, height - margin * 2);
+
+      // Inner thin pinstripe
+      ctx.lineWidth = 4;
+      ctx.strokeRect(margin + 25, margin + 25, width - (margin + 25) * 2, height - (margin + 25) * 2);
+
+      // Corner vector accents
+      function drawCorner(cx, cy, angle) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(angle);
         ctx.beginPath();
         ctx.moveTo(0, 0);
         ctx.lineTo(cornerSize, 0);
         ctx.bezierCurveTo(cornerSize * 0.7, cornerSize * 0.15, cornerSize * 0.35, cornerSize * 0.45, cornerSize * 0.25, cornerSize * 0.85);
         ctx.lineTo(0, cornerSize * 0.85);
         ctx.closePath();
-
-        const mainFillGrad = ctx.createLinearGradient(0, 0, cornerSize * 0.6, cornerSize * 0.6);
-        mainFillGrad.addColorStop(0, `rgb(${pRgb.r}, ${pRgb.g}, ${pRgb.b})`);
-        mainFillGrad.addColorStop(0.5, `rgb(${Math.max(0, pRgb.r - 20)}, ${Math.max(0, pRgb.g - 20)}, ${Math.max(0, pRgb.b - 20)})`);
-        mainFillGrad.addColorStop(1, `rgb(${dRgb.r}, ${dRgb.g}, ${dRgb.b})`);
-        ctx.fillStyle = mainFillGrad;
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-        ctx.shadowBlur = 35;
-        ctx.shadowOffsetX = 15;
-        ctx.shadowOffsetY = 15;
+        ctx.fillStyle = colorMain;
         ctx.fill();
 
-        // 2. Beveled Metallic Gold Border on the Inner Wave
-        ctx.save();
-        ctx.shadowColor = 'transparent';
         ctx.beginPath();
         ctx.moveTo(cornerSize, 0);
         ctx.bezierCurveTo(cornerSize * 0.7, cornerSize * 0.15, cornerSize * 0.35, cornerSize * 0.45, cornerSize * 0.25, cornerSize * 0.85);
-        ctx.lineWidth = goldTrim;
-        const cornerGoldGrad = ctx.createLinearGradient(cornerSize, 0, cornerSize * 0.25, cornerSize * 0.85);
-        cornerGoldGrad.addColorStop(0, '#FFE89E');
-        cornerGoldGrad.addColorStop(0.3, '#D4AF37');
-        cornerGoldGrad.addColorStop(0.6, '#FFF8CC');
-        cornerGoldGrad.addColorStop(0.85, '#997300');
-        cornerGoldGrad.addColorStop(1, '#FFE89E');
-        ctx.strokeStyle = cornerGoldGrad;
+        ctx.lineWidth = 20;
+        ctx.strokeStyle = colorLight;
         ctx.stroke();
-
-        // 3. Secondary Inner Layer Ribbon (Darker Saturation Contrast)
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.lineTo(cornerSize * 0.65, 0);
-        ctx.bezierCurveTo(cornerSize * 0.45, cornerSize * 0.1, cornerSize * 0.25, cornerSize * 0.3, cornerSize * 0.15, cornerSize * 0.6);
-        ctx.lineTo(0, cornerSize * 0.6);
-        ctx.closePath();
-
-        const innerRibbonGrad = ctx.createLinearGradient(0, 0, cornerSize * 0.4, cornerSize * 0.4);
-        innerRibbonGrad.addColorStop(0, `rgb(${Math.min(255, pRgb.r + 30)}, ${Math.min(255, pRgb.g + 30)}, ${Math.min(255, pRgb.b + 40)})`);
-        innerRibbonGrad.addColorStop(1, `rgb(${pRgb.r}, ${pRgb.g}, ${pRgb.b})`);
-        ctx.fillStyle = innerRibbonGrad;
-        ctx.fill();
-
-        // Secondary gold accent line
-        ctx.beginPath();
-        ctx.moveTo(cornerSize * 0.65, 0);
-        ctx.bezierCurveTo(cornerSize * 0.45, cornerSize * 0.1, cornerSize * 0.25, cornerSize * 0.3, cornerSize * 0.15, cornerSize * 0.6);
-        ctx.lineWidth = 8;
-        ctx.strokeStyle = cornerGoldGrad;
-        ctx.stroke();
-
-        // 4. Subtle Ornate Guilloche Geometric Accent Lines in Corner
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgba(255, 232, 158, 0.4)';
-        for (let l = 1; l <= 5; l++) {
-          const offset = l * 16;
-          ctx.beginPath();
-          ctx.moveTo(offset, offset);
-          ctx.lineTo(cornerSize * 0.35 + offset, offset);
-          ctx.bezierCurveTo(cornerSize * 0.25 + offset, offset + 20, cornerSize * 0.15 + offset, cornerSize * 0.15 + offset, offset, cornerSize * 0.35 + offset);
-          ctx.closePath();
-          ctx.stroke();
-        }
-
-        ctx.restore();
         ctx.restore();
       }
 
-      // Draw Top-Left Corner
-      drawCornerAccents(margin, margin, 0);
-      // Draw Top-Right Corner
-      drawCornerAccents(width - margin, margin, Math.PI / 2);
-      // Draw Bottom-Right Corner
-      drawCornerAccents(width - margin, height - margin, Math.PI);
-      // Draw Bottom-Left Corner
-      drawCornerAccents(margin, height - margin, -Math.PI / 2);
-
-      // Top & Bottom Center Gold Header Plaque Accent
-      ctx.save();
-      const topPlaqueW = 500;
-      const topPlaqueH = 36;
-      const topPlaqueGrad = ctx.createLinearGradient((width - topPlaqueW) / 2, 0, (width + topPlaqueW) / 2, 0);
-      topPlaqueGrad.addColorStop(0, 'rgba(212, 175, 55, 0)');
-      topPlaqueGrad.addColorStop(0.2, '#FFE89E');
-      topPlaqueGrad.addColorStop(0.5, '#D4AF37');
-      topPlaqueGrad.addColorStop(0.8, '#FFE89E');
-      topPlaqueGrad.addColorStop(1, 'rgba(212, 175, 55, 0)');
-
-      ctx.fillStyle = topPlaqueGrad;
-      ctx.fillRect((width - topPlaqueW) / 2, margin - 18, topPlaqueW, topPlaqueH);
-      ctx.fillRect((width - topPlaqueW) / 2, height - margin - 18, topPlaqueW, topPlaqueH);
+      drawCorner(margin, margin, 0);
+      drawCorner(width - margin, margin, Math.PI / 2);
+      drawCorner(width - margin, height - margin, Math.PI);
+      drawCorner(margin, height - margin, -Math.PI / 2);
       ctx.restore();
 
     } else if (isNote) {
       // =========================================================================
-      // 2. RENDER PINNED STICKY NOTE
+      // 3. RENDER PINNED STICKY NOTE
       // =========================================================================
       const noteW = 1600;
       const noteH = 1600;
@@ -193,11 +226,6 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       const curl = 140;
 
       ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.35)';
-      ctx.shadowBlur = 45;
-      ctx.shadowOffsetX = 15;
-      ctx.shadowOffsetY = 25;
-
       ctx.beginPath();
       ctx.moveTo(nx, ny);
       ctx.lineTo(nx + noteW, ny);
@@ -211,32 +239,23 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       noteGrad.addColorStop(1, colorLight);
       ctx.fillStyle = noteGrad;
       ctx.fill();
-      ctx.restore();
 
       // Pin
-      ctx.save();
       ctx.beginPath();
       ctx.arc(width / 2, ny + 70, 42, 0, Math.PI * 2);
       ctx.fillStyle = '#E63946';
-      ctx.shadowColor = 'rgba(0,0,0,0.4)';
-      ctx.shadowBlur = 18;
-      ctx.shadowOffsetY = 12;
       ctx.fill();
       ctx.restore();
 
     } else if (isBadge) {
       // =========================================================================
-      // 3. RENDER 3D GOLD ROSETTE GUARANTEE BADGE
+      // 4. RENDER 3D ROSETTE GUARANTEE BADGE
       // =========================================================================
       const cx = width / 2;
       const cy = height / 2;
       const r = 700;
 
       ctx.save();
-      ctx.shadowColor = 'rgba(0,0,0,0.4)';
-      ctx.shadowBlur = 60;
-      ctx.shadowOffsetY = 30;
-
       ctx.beginPath();
       const points = 36;
       for (let p = 0; p < points * 2; p++) {
@@ -249,16 +268,16 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       }
       ctx.closePath();
       const badgeGrad = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
-      badgeGrad.addColorStop(0, '#FFE89E');
-      badgeGrad.addColorStop(0.5, '#D4AF37');
-      badgeGrad.addColorStop(1, '#997300');
+      badgeGrad.addColorStop(0, colorLight);
+      badgeGrad.addColorStop(0.5, colorMain);
+      badgeGrad.addColorStop(1, colorDark);
       ctx.fillStyle = badgeGrad;
       ctx.fill();
       ctx.restore();
 
     } else {
       // =========================================================================
-      // 4. RENDER VOLUMETRIC STAGE SPOTLIGHT
+      // 5. RENDER VOLUMETRIC SPOTLIGHT
       // =========================================================================
       const targetX = width * 0.50;
       const targetY = height * 0.05;
@@ -269,9 +288,9 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
       const grad = ctx.createLinearGradient(targetX, targetY, targetX, floorY);
-      grad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-      grad.addColorStop(0.2, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.8)`);
-      grad.addColorStop(0.8, `rgba(${sRgb.r}, ${sRgb.g}, ${sRgb.b}, 0.2)`);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      grad.addColorStop(0.2, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.85)`);
+      grad.addColorStop(0.8, `rgba(${sRgb.r}, ${sRgb.g}, ${sRgb.b}, 0.25)`);
       grad.addColorStop(1, 'rgba(0,0,0,0)');
 
       ctx.beginPath();
