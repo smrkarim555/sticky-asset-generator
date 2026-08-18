@@ -138,7 +138,7 @@ async function startServer() {
     const startTime = Date.now();
     try {
       const customKey = (req.headers['x-gemini-api-key'] as string) || req.body?.apiKey;
-      const modelToUse = (req.body?.geminiModel || (req.headers['x-gemini-model'] as string) || "gemini-3.7-flash").trim();
+      const modelToUse = (req.body?.geminiModel || (req.headers['x-gemini-model'] as string) || "gemini-2.5-flash").trim();
       const ai = getGeminiClient(customKey);
       if (!ai) {
         return res.status(400).json({ success: false, error: "No Gemini API key provided or found on server." });
@@ -175,10 +175,11 @@ async function startServer() {
 Look at the user's input or attached reference image.
 Transform it into an ultra-detailed, commercial-grade 4K vector artwork specification.
 Include:
-1. EXACT SUBJECT & OPTICAL PHENOMENON: Identify the true subject (e.g. Optical Lens Flare / Horizontal Anamorphic Light Streak, Starburst Diffraction Rays, Volumetric Glow, Neon Luminescence, Pinned Note, Badge, Border Frame, etc.).
-2. LIGHTING & GLOW: Intense white-hot core, color falloff, soft radial bloom, zero black outer halos, 100% transparent background (alpha = 0).
-3. COLOR PALETTE: Exact hex colors and gradient transitions.
-4. ADOBE STOCK 4K STANDARDS: 3840x2160 true RGBA alpha cutout, transparent background, crisp details.
+1. EXACT SUBJECT & REPLICATION: Identify the true subject (e.g. Spiral Notebook Torn Grid Paper, Binder Punched Holes, Lined Memo, Sticky Note, Optical Lens Flare / Anamorphic Streak, Starburst Diffraction, Neon Badge, Border Frame, etc.).
+2. STRUCTURE & TEXTURE: Grid spacing, jagged torn paper edges, punched holes, metallic reflections, fiber noise, or light streaks.
+3. 100% TRANSPARENT BACKGROUND (alpha = 0): Zero black boxes, zero outer background shadows.
+4. COLOR PALETTE: Exact hex colors and gradient transitions.
+5. ADOBE STOCK 4K STANDARDS: 3840x2160 true RGBA alpha cutout.
 
 Return ONLY the enhanced prompt text (no conversational fluff).`;
 
@@ -186,7 +187,7 @@ Return ONLY the enhanced prompt text (no conversational fluff).`;
       if (!client) {
         return res.status(400).json({ success: false, error: "Gemini API key is required to enhance prompt. Please enter your Gemini API key in Settings." });
       }
-      const selectedModel = (geminiModel || "gemini-3.7-flash").trim();
+      const selectedModel = (geminiModel || "gemini-2.5-flash").trim();
       const contents: any[] = [];
       if (imageDataUrl) {
         const matches = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
@@ -509,7 +510,7 @@ Return strictly valid JSON:
 
       const { subjectPrompt, imageDataUrl, geminiModel, numVariations, aspectRatio } = req.body;
       const customGeminiKey = (req.headers['x-gemini-api-key'] as string) || req.body?.apiKey;
-      const selectedGeminiModel = (geminiModel || (req.headers['x-gemini-model'] as string) || "gemini-3.7-flash").trim();
+      const selectedGeminiModel = (geminiModel || (req.headers['x-gemini-model'] as string) || "gemini-2.5-flash").trim();
 
       const count = [2, 4, 6, 8].includes(Number(numVariations)) ? Number(numVariations) : 4;
       const aspect = aspectRatio || "16:9";
@@ -524,22 +525,30 @@ Return strictly valid JSON:
       const variationJsonSchemaItems = Array.from({ length: count }, (_, i) => `    { "id": "v${i+1}", "name": "Variant ${i+1} Name", "primaryColor": "#HEX", "secondaryColor": "#HEX", "filename": "output_v${i+1}.png", "styleDesc": "Colorway variant ${i+1}" }`).join(",\n");
 
       const promptTemplate = `ROLE
-You are a world-class Python graphics and computer vision engineer.
+You are an elite Python computer vision & vector graphics engineer.
 Build a commercial-grade 4K transparent PNG asset script entirely in code using PyCairo, Pillow (PIL), NumPy, and OpenCV.
 Do NOT use AI background-removal or blurry cutouts; construct the exact visual phenomenon programmatically using mathematical paths, Bezier curves, radial/linear gradients, and compositing.
 
 SUBJECT & REFERENCE REPLICATION (CRITICAL):
-- Carefully look at the attached reference image (or user prompt: "${subjectPrompt || "High resolution transparent vector asset"}").
-- Faithfully REPLICATE the EXACT visual subject and optical phenomenon present in the reference:
+- Carefully inspect the attached reference image (or user prompt: "${subjectPrompt || "High resolution transparent vector asset"}").
+- Faithfully REPLICATE the EXACT visual subject and physical characteristics present in the reference:
+  * If it is NOTEBOOK PAPER / TORN GRID PAPER / LINED MEMO / STICKY NOTE / KRAFT SHEET:
+    - Draw the paper sheet base (realistic crisp white/cream/ivory/kraft).
+    - If it has a GRID/GRAPH pattern: render the clean square quad mesh lines across the entire paper surface with subtle opacity.
+    - If it has TORN EDGES (e.g. left spiral edge or bottom):
+      * Draw the realistic jagged torn paper contour using randomized zigzag / bezier paths.
+      * Draw the spiral binder punched holes along the margin (circular punched holes with torn-through openings).
+    - Add subtle paper fiber grain micro-texture.
+    - Absolute ZERO background shadow or dark boxes on the overall canvas — only pure transparent background outside the paper boundary.
   * If it is an OPTICAL LENS FLARE / HORIZONTAL LIGHT STREAK / ANAMORPHIC BEAM:
     - Draw the glowing white-hot focal core at the center.
-    - Draw the wide razor-sharp horizontal anamorphic light streaks spanning across the canvas using linear gradients with smooth alpha falloff.
-    - Draw the multi-point starburst / diamond diffraction rays radiating outward.
-    - Draw soft chromatic halo rings and subtle glowing stardust bokeh particles.
-  * If it is a STICKY NOTE / PAPER: Draw the paper rectangle, curled corner, pushpin/tape, and subtle shadow.
-  * If it is a BADGE / SEAL: Draw the 3D beveled circle/shield, star rosette, ribbons, and metallic reflection.
-  * If it is a CERTIFICATE FRAME: Draw the border frame with ornate corner wings and 100% transparent center window.
-  * If it is any other graphic: faithfully recreate its exact shapes, geometry, and lighting.
+    - Draw wide razor-sharp horizontal anamorphic light streaks with smooth alpha falloff.
+    - Draw multi-point starburst / diamond diffraction rays and soft halo bloom.
+  * If it is a BADGE / SEAL / EMBLEM:
+    - Draw 3D beveled circle/shield, star rosette, metallic specular highlights.
+  * If it is a CERTIFICATE BORDER FRAME:
+    - Draw the border frame with ornate corner filigree and 100% transparent center window.
+  * For ANY OTHER graphic: faithfully recreate its exact shapes, geometry, lines, and shading.
 
 BACKGROUND & TRANSPARENCY REQUIREMENTS (MANDATORY):
 1. Background MUST be 100% transparent (RGBA with alpha = 0). Canvas size: ${resWidth} x ${resHeight} px.
@@ -581,10 +590,12 @@ ${variationJsonSchemaItems}
 
       const candidateModels = [
         selectedGeminiModel,
-        "gemini-3.7-flash",
         "gemini-2.5-flash",
+        "gemini-2.5-pro",
         "gemini-2.0-flash",
-        "gemini-1.5-flash"
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash",
+        "gemini-1.5-pro"
       ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
       let rawText = "";
@@ -701,21 +712,60 @@ ${variationJsonSchemaItems}
       let pythonCodeToSave = generatedData.pythonCode || "";
       pythonCodeToSave = pythonCodeToSave.replace(/^```python\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
 
-      // PyCairo helper for quadratic curves and clean transparency
-      const quadHelper = `# PyCairo helper for quadratic curves & clean transparency
+      // Bulletproof PyCairo & Graphics Helpers Header
+      const bulletproofHeader = `# Bulletproof PyCairo & Graphics Helpers
+import cairo
+import numpy as np
+import math
+
+# 1. Patch cairo.Context to safely handle 5 or 6 argument arc/arc_negative
+_cairo_orig_arc = cairo.Context.arc
+_cairo_orig_arc_negative = cairo.Context.arc_negative
+
+def _safe_cairo_arc(self, xc, yc, radius, angle1, angle2, *args, **kwargs):
+    ccw = kwargs.get('counterclockwise', False)
+    if len(args) > 0 and (args[0] is True or str(args[0]).lower() == 'true'):
+        ccw = True
+    if ccw:
+        return _cairo_orig_arc_negative(self, float(xc), float(yc), float(radius), float(angle1), float(angle2))
+    return _cairo_orig_arc(self, float(xc), float(yc), float(radius), float(angle1), float(angle2))
+
+def _safe_cairo_arc_negative(self, xc, yc, radius, angle1, angle2, *args, **kwargs):
+    return _cairo_orig_arc_negative(self, float(xc), float(yc), float(radius), float(angle1), float(angle2))
+
+cairo.Context.arc = _safe_cairo_arc
+cairo.Context.arc_negative = _safe_cairo_arc_negative
+
+# 2. Quadratic curve and rounded rectangle helpers
 def draw_quad_curve(ctx, qx, qy, endx, endy):
     try:
         x0, y0 = ctx.get_current_point()
-        c1x = x0 + (2.0/3.0)*(qx - x0)
-        c1y = y0 + (2.0/3.0)*(qy - y0)
-        c2x = endx + (2.0/3.0)*(qx - endx)
-        c2y = endy + (2.0/3.0)*(qy - endy)
-        ctx.curve_to(c1x, c1y, c2x, c2y, endx, endy)
+        c1x = x0 + (2.0/3.0)*(float(qx) - x0)
+        c1y = y0 + (2.0/3.0)*(float(qy) - y0)
+        c2x = float(endx) + (2.0/3.0)*(float(qx) - float(endx))
+        c2y = float(endy) + (2.0/3.0)*(float(qy) - float(endy))
+        ctx.curve_to(c1x, c1y, c2x, c2y, float(endx), float(endy))
     except Exception:
-        pass
+        ctx.line_to(float(endx), float(endy))
+
+def draw_rounded_rectangle(ctx, x, y, w, h, r):
+    try:
+        r = min(float(r), float(w)/2.0, float(h)/2.0)
+        ctx.new_sub_path()
+        ctx.arc(float(x) + float(w) - r, float(y) + r, r, -np.pi/2, 0)
+        ctx.arc(float(x) + float(w) - r, float(y) + float(h) - r, r, 0, np.pi/2)
+        ctx.arc(float(x) + r, float(y) + float(h) - r, r, np.pi/2, np.pi)
+        ctx.arc(float(x) + r, float(y) + r, r, np.pi, 3*np.pi/2)
+        ctx.close_path()
+    except Exception:
+        ctx.rectangle(float(x), float(y), float(w), float(h))
+
+cairo.Context.quadratic_curve_to = draw_quad_curve
+cairo.Context.rounded_rectangle = draw_rounded_rectangle
+cairo.Context.round_rectangle = draw_rounded_rectangle
 `;
 
-      pythonCodeToSave = quadHelper + "\n\n" + pythonCodeToSave.trim() + "\n";
+      pythonCodeToSave = bulletproofHeader + "\n\n" + pythonCodeToSave.trim() + "\n";
 
       // Auto-replace any hallucinated methods & invalid parameters in PyCairo, OpenCV & Scipy
       pythonCodeToSave = pythonCodeToSave.replace(/([a-zA-Z0-9_]+)\.quadratic_curve_to\(/g, "draw_quad_curve($1, ");

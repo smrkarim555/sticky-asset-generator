@@ -48,15 +48,15 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
 
     const descLower = ((item.name || '') + ' ' + (item.styleDesc || '') + ' ' + (item.patternType || '') + ' ' + assetType).toLowerCase();
 
-    // Pattern detection - ORDER MATTERS: specific patterns first, lens_flare last
-    const isNetworkGrid = descLower.includes('network') || descLower.includes('grid') || descLower.includes('diamond') || descLower.includes('circuit') || descLower.includes('connect') || descLower.includes('node') || descLower.includes('tech_pattern') || descLower.includes('network_grid');
-    const isHexGrid = descLower.includes('hexagon') || descLower.includes('honeycomb') || descLower.includes('hexagon_grid');
+    // Pattern detection - ORDER MATTERS: specific semantic subjects first
+    const isNote = descLower.includes('paper') || descLower.includes('note') || descLower.includes('memo') || descLower.includes('sticky') || descLower.includes('torn') || descLower.includes('notebook') || descLower.includes('sheet') || descLower.includes('binder');
+    const isNetworkGrid = !isNote && (descLower.includes('network') || descLower.includes('plexus') || descLower.includes('circuit') || descLower.includes('tech') || descLower.includes('cyber') || descLower.includes('diamond') || descLower.includes('node') || descLower.includes('network_grid'));
+    const isHexGrid = !isNote && (descLower.includes('hexagon') || descLower.includes('honeycomb') || descLower.includes('hexagon_grid'));
     const isWavePattern = descLower.includes('wave') || descLower.includes('curve') || descLower.includes('ribbon') || descLower.includes('swirl') || descLower.includes('flow') || descLower.includes('wave_pattern');
     const isParticleScatter = descLower.includes('particle') || descLower.includes('scatter') || descLower.includes('bokeh') || descLower.includes('confetti') || descLower.includes('dust') || descLower.includes('particle_scatter');
-    const isAbstractGeo = descLower.includes('abstract_geometric') || descLower.includes('geometric') || descLower.includes('polygon');
+    const isAbstractGeo = !isNote && (descLower.includes('abstract_geometric') || descLower.includes('geometric') || descLower.includes('polygon'));
     const isFlare = descLower.includes('flare') || descLower.includes('lens') || descLower.includes('streak') || descLower.includes('anamorphic') || descLower.includes('beam') || descLower.includes('laser') || descLower.includes('glow_streak') || descLower.includes('spark');
     const isFrame = descLower.includes('frame') || descLower.includes('border') || descLower.includes('certificate') || descLower.includes('diploma');
-    const isNote = descLower.includes('sticky') || descLower.includes('note') || descLower.includes('memo') || descLower.includes('paper');
     const isBadge = descLower.includes('badge') || descLower.includes('shield') || descLower.includes('seal') || descLower.includes('medal') || descLower.includes('guarantee');
     const isSpotlight = descLower.includes('spotlight') || descLower.includes('shaft') || descLower.includes('conical');
 
@@ -470,33 +470,127 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
 
     } else if (isNote) {
       // =========================================================================
-      // RENDER PINNED STICKY NOTE
+      // RENDER 4K TORN GRID NOTEBOOK PAPER / STICKY MEMO
       // =========================================================================
-      const noteW = 1600;
-      const noteH = 1600;
-      const nx = (width - noteW) / 2;
-      const ny = (height - noteH) / 2;
-      const curl = 140;
-
       ctx.save();
-      ctx.beginPath();
-      ctx.moveTo(nx, ny);
-      ctx.lineTo(nx + noteW, ny);
-      ctx.lineTo(nx + noteW, ny + noteH - curl);
-      ctx.bezierCurveTo(nx + noteW - curl * 0.4, ny + noteH - curl * 0.2, nx + noteW - curl * 0.8, ny + noteH, nx + noteW - curl, ny + noteH);
-      ctx.lineTo(nx, ny + noteH);
-      ctx.closePath();
+      const isTornGrid = descLower.includes('grid') || descLower.includes('torn') || descLower.includes('notebook') || descLower.includes('sheet') || descLower.includes('binder');
+      
+      if (isTornGrid) {
+        // Dimensions matching standard 4K reference canvas
+        const paperW = 2800;
+        const paperH = 1750;
+        const px = (width - paperW) / 2 + 100;
+        const py = (height - paperH) / 2;
+        const numHoles = 14;
+        const holeSpacing = paperH / (numHoles + 1);
+        const holeRadius = 26;
 
-      const noteGrad = ctx.createLinearGradient(nx, ny, nx + noteW, ny + noteH);
-      noteGrad.addColorStop(0, colorMain);
-      noteGrad.addColorStop(1, colorLight);
-      ctx.fillStyle = noteGrad;
-      ctx.fill();
+        // Draw Paper base path with torn ragged left margin
+        ctx.beginPath();
+        // Top edge
+        ctx.moveTo(px, py);
+        ctx.lineTo(px + paperW, py);
+        // Right edge
+        ctx.lineTo(px + paperW, py + paperH);
+        // Bottom edge
+        ctx.lineTo(px, py + paperH);
 
-      ctx.beginPath();
-      ctx.arc(width / 2, ny + 70, 42, 0, Math.PI * 2);
-      ctx.fillStyle = '#E63946';
-      ctx.fill();
+        // Left torn edge with spiral notebook holes
+        const segSteps = 300;
+        for (let s = segSteps; s >= 0; s--) {
+          const curY = py + (s / segSteps) * paperH;
+          let curX = px + (random() - 0.5) * 8;
+
+          // Check if near a punched ring hole
+          for (let h = 1; h <= numHoles; h++) {
+            const hy = py + h * holeSpacing;
+            const dist = Math.abs(curY - hy);
+            if (dist < holeRadius) {
+              const dx = Math.sqrt(Math.max(0, holeRadius * holeRadius - dist * dist));
+              curX = px + dx + (random() - 0.5) * 6;
+              break;
+            }
+          }
+          ctx.lineTo(curX, curY);
+        }
+        ctx.closePath();
+
+        // Paper base fill (Crisp White / Ivory Paper Texture)
+        const paperGrad = ctx.createLinearGradient(px, py, px + paperW, py + paperH);
+        paperGrad.addColorStop(0, '#FAFAFA');
+        paperGrad.addColorStop(1, '#F0F0F0');
+        ctx.fillStyle = paperGrad;
+        ctx.fill();
+
+        // Subtle paper perimeter border
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(210, 210, 210, 0.6)';
+        ctx.stroke();
+
+        // Draw Precise Graph Grid Lines across the paper
+        ctx.save();
+        ctx.clip(); // Keep grid within paper boundary
+
+        const gridStep = 40; // 40px square grid in 4K
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = 'rgba(180, 195, 210, 0.45)'; // Realistic notebook blue/gray grid
+        ctx.beginPath();
+
+        for (let gx = px + 60; gx < px + paperW; gx += gridStep) {
+          ctx.moveTo(gx, py);
+          ctx.lineTo(gx, py + paperH);
+        }
+        for (let gy = py; gy < py + paperH; gy += gridStep) {
+          ctx.moveTo(px, gy);
+          ctx.lineTo(px + paperW, gy);
+        }
+        ctx.stroke();
+
+        // Render Punched Spiral Binder Holes with realistic paper fibers
+        for (let h = 1; h <= numHoles; h++) {
+          const hy = py + h * holeSpacing;
+          ctx.save();
+          ctx.globalCompositeOperation = 'destination-out';
+          ctx.beginPath();
+          ctx.arc(px + 4, hy, holeRadius - 2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          // Hole inner rim shadow
+          ctx.beginPath();
+          ctx.arc(px + 4, hy, holeRadius - 2, 0, Math.PI * 2);
+          ctx.lineWidth = 2;
+          ctx.strokeStyle = 'rgba(200, 200, 200, 0.5)';
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      } else {
+        const noteW = 1600;
+        const noteH = 1600;
+        const nx = (width - noteW) / 2;
+        const ny = (height - noteH) / 2;
+        const curl = 140;
+
+        ctx.beginPath();
+        ctx.moveTo(nx, ny);
+        ctx.lineTo(nx + noteW, ny);
+        ctx.lineTo(nx + noteW, ny + noteH - curl);
+        ctx.bezierCurveTo(nx + noteW - curl * 0.4, ny + noteH - curl * 0.2, nx + noteW - curl * 0.8, ny + noteH, nx + noteW - curl, ny + noteH);
+        ctx.lineTo(nx, ny + noteH);
+        ctx.closePath();
+
+        const noteGrad = ctx.createLinearGradient(nx, ny, nx + noteW, ny + noteH);
+        noteGrad.addColorStop(0, colorMain);
+        noteGrad.addColorStop(1, colorLight);
+        ctx.fillStyle = noteGrad;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(width / 2, ny + 70, 42, 0, Math.PI * 2);
+        ctx.fillStyle = '#E63946';
+        ctx.fill();
+      }
       ctx.restore();
 
     } else if (isBadge) {

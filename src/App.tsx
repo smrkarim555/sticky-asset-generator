@@ -38,24 +38,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { SpotlightVariation, BackgroundMode } from './types';
 
 export const GEMINI_MODELS = [
-  { id: "gemini-3.7-flash", name: "gemini-3.7-flash (Latest 3.7 Flash - Recommended)" },
-  { id: "gemini-3.7-pro", name: "gemini-3.7-pro (3.7 Pro Deep Reasoning)" },
-  { id: "gemini-3.6-flash", name: "gemini-3.6-flash (3.6 Flash)" },
-  { id: "gemini-3.6-pro", name: "gemini-3.6-pro (3.6 Pro)" },
-  { id: "gemini-3.5-flash", name: "gemini-3.5-flash (3.5 Flash)" },
-  { id: "gemini-3.5-pro", name: "gemini-3.5-pro (3.5 Pro)" },
-  { id: "gemini-3.4-flash", name: "gemini-3.4-flash (3.4 Flash)" },
-  { id: "gemini-3.4-pro", name: "gemini-3.4-pro (3.4 Pro)" },
-  { id: "gemini-3.3-flash", name: "gemini-3.3-flash (3.3 Flash)" },
-  { id: "gemini-3.3-pro", name: "gemini-3.3-pro (3.3 Pro)" },
-  { id: "gemini-3.2-flash", name: "gemini-3.2-flash (3.2 Flash)" },
-  { id: "gemini-3.2-pro", name: "gemini-3.2-pro (3.2 Pro)" },
-  { id: "gemini-3.1-flash", name: "gemini-3.1-flash (3.1 Flash)" },
-  { id: "gemini-3.1-pro", name: "gemini-3.1-pro (3.1 Pro)" },
-  { id: "gemini-2.5-flash", name: "gemini-2.5-flash (2.5 Flash Stable)" },
-  { id: "gemini-2.5-pro", name: "gemini-2.5-pro (2.5 Pro High Quality)" },
-  { id: "gemini-2.0-flash", name: "gemini-2.0-flash (2.0 Flash)" },
-  { id: "gemini-1.5-flash", name: "gemini-1.5-flash (1.5 Flash High Quota)" },
+  { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash (Recommended - Fastest Multimodal Vision & Python Code)" },
+  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro (Highest Quality Vector Accuracy & Deep Reasoning)" },
+  { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash (Next-Gen Multimodal Vision)" },
+  { id: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash Lite (High Speed & Low Latency)" },
+  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash (Stable High Quota Multimodal)" },
+  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro (Deep Visual Analysis & Precision)" },
+  { id: "gemini-2.0-pro-exp-02-05", name: "Gemini 2.0 Pro Experimental (Advanced Coding)" }
 ];
 
 export const DEFAULT_TEMPLATE_1_PROMPT = `ROLE
@@ -150,7 +139,11 @@ export default function App() {
   const [apiKeyInput, setApiKeyInput] = useState<string>('');
   const [apiKeyLabelInput, setApiKeyLabelInput] = useState<string>('');
   const savedApiKey = storedKeys.length > 0 && activeKeyIndex < storedKeys.length ? storedKeys[activeKeyIndex].key : '';
-  const [geminiModel, setGeminiModel] = useState<string>(() => localStorage.getItem('user_gemini_model') || 'gemini-3.7-flash');
+  const [geminiModel, setGeminiModel] = useState<string>(() => {
+    const saved = localStorage.getItem('user_gemini_model');
+    const validIds = GEMINI_MODELS.map(m => m.id);
+    return saved && validIds.includes(saved) ? saved : 'gemini-2.5-flash';
+  });
 
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
   const [showApiKeyText, setShowApiKeyText] = useState<boolean>(false);
