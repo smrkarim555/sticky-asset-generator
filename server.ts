@@ -559,31 +559,52 @@ Return strictly valid JSON:
 
       const variationJsonSchemaItems = Array.from({ length: count }, (_, i) => `    { "id": "v${i+1}", "name": "Variant ${i+1} Name", "primaryColor": "#HEX", "secondaryColor": "#HEX", "filename": "output_v${i+1}.png", "styleDesc": "Colorway variant ${i+1}" }`).join(",\n");
 
-      const promptTemplate = `ROLE
+      const promptTemplate = imageDataUrl ? `ROLE: World-Class Python Computer Vision & Vector Graphics Engineer (PyCairo / Pillow / NumPy / OpenCV).
+
+YOUR PRIMARY MISSION:
+Inspect the attached reference image with extreme visual precision.
+Write a complete, runnable Python script (generate.py) that EXACTLY REPRODUCES the graphic artwork shown in the reference image.
+
+CRITICAL VISUAL REPLICATION RULES:
+1. SPATIAL GEOMETRY & EXACT PLACEMENT (CRITICAL):
+   - Pay close attention to WHERE the graphic element is located on the canvas.
+   - If the graphic is positioned ONLY on the LEFT side (e.g. Modern Left-Side Curved Header, Folded Chevron Ribbon, Decorative Sidebar, Wave Banner), draw it ONLY on the LEFT side! DO NOT draw on the right, top-right, bottom-right, or all 4 corners!
+   - If it is a single ribbon/banner/badge/paper, reproduce its exact spatial boundaries, width ratio (e.g. spanning left 30% of canvas), curvature, and folds.
+   - The remaining area (e.g. the entire right 70% of canvas) MUST REMAIN 100% CLEAN & TRANSPARENT (RGBA alpha = 0).
+
+2. MULTI-LAYER BEZIER PATHING & SHADING:
+   - Base Layer: Draw the background curved polygon (e.g. deep emerald green '#003816' -> '#005C25') using smooth Bezier curves (ctx.curve_to).
+   - Ribbon / Chevron Layer: Draw the sharp folded chevron / arrow ribbon band with rich metallic glossy gold linear gradients ('#FFF6D1' -> '#D4AF37' -> '#996515' -> '#593A0E') and crisp specular highlight strokes.
+   - Inner Bevel / Shadows: Add subtle darker drop shadow between the overlapping ribbon and background wave.
+   - Rounded corners on the left edge if present in reference.
+
+3. 100% TRANSPARENT CANVAS (MANDATORY):
+   - Canvas resolution: ${resWidth} x ${resHeight} px (RGBA format).
+   - Canvas surface MUST be completely clear/transparent (ctx.set_source_rgba(0,0,0,0); ctx.paint()).
+   - ABSOLUTELY NO outer background boxes, NO grey rectangles, NO canvas-wide vignettes, NO overall drop shadow on the canvas background.
+
+4. 4K COMMERCIAL COLORWAY VARIATIONS:
+   - Generate ${count} distinct commercial colorway variations (output_v1.png to output_v${count}.png) in the current directory:
+     * Variant 1: Exact original colorway from the reference (e.g. Emerald Green & Metallic Gold).
+     * Variant 2: Royal Sapphire Navy Blue & Champagne Gold.
+     * Variant 3: Crimson Ruby Red & Rose Gold.
+     * Variant 4: Luxury Obsidian Black & Platinum Silver / Gold.
+   - Each PNG file size must be uncompressed high-fidelity 4K (2.0 MB to 10.0 MB).
+
+Return strictly valid JSON:
+{
+  "projectFolder": "descriptive_folder_name_in_lowercase",
+  "themeName": "Exact Descriptive Title of the Artwork (e.g. Modern Left-Side Chevron Ribbon Banner)",
+  "pythonCode": "Complete runnable python code",
+  "variations": [
+${variationJsonSchemaItems}
+  ]
+}` : `ROLE
 You are an elite Python computer vision & vector graphics engineer.
 Build a commercial-grade 4K transparent PNG asset script entirely in code using PyCairo, Pillow (PIL), NumPy, and OpenCV.
 Do NOT use AI background-removal or blurry cutouts; construct the exact visual phenomenon programmatically using mathematical paths, Bezier curves, radial/linear gradients, and compositing.
 
-SUBJECT & REFERENCE REPLICATION (CRITICAL):
-- Carefully inspect the attached reference image (or user prompt: "${subjectPrompt || "High resolution transparent vector asset"}").
-- Faithfully REPLICATE the EXACT visual subject and physical characteristics present in the reference:
-  * If it is NOTEBOOK PAPER / TORN GRID PAPER / LINED MEMO / STICKY NOTE / KRAFT SHEET:
-    - Draw the paper sheet base (realistic crisp white/cream/ivory/kraft).
-    - If it has a GRID/GRAPH pattern: render the clean square quad mesh lines across the entire paper surface with subtle opacity.
-    - If it has TORN EDGES (e.g. left spiral edge or bottom):
-      * Draw the realistic jagged torn paper contour using randomized zigzag / bezier paths.
-      * Draw the spiral binder punched holes along the margin (circular punched holes with torn-through openings).
-    - Add subtle paper fiber grain micro-texture.
-    - Absolute ZERO background shadow or dark boxes on the overall canvas — only pure transparent background outside the paper boundary.
-  * If it is an OPTICAL LENS FLARE / HORIZONTAL LIGHT STREAK / ANAMORPHIC BEAM:
-    - Draw the glowing white-hot focal core at the center.
-    - Draw wide razor-sharp horizontal anamorphic light streaks with smooth alpha falloff.
-    - Draw multi-point starburst / diamond diffraction rays and soft halo bloom.
-  * If it is a BADGE / SEAL / EMBLEM:
-    - Draw 3D beveled circle/shield, star rosette, metallic specular highlights.
-  * If it is a CERTIFICATE BORDER FRAME:
-    - Draw the border frame with ornate corner filigree and 100% transparent center window.
-  * For ANY OTHER graphic: faithfully recreate its exact shapes, geometry, lines, and shading.
+SUBJECT PROMPT: "${subjectPrompt || "High resolution transparent vector asset"}"
 
 BACKGROUND & TRANSPARENCY REQUIREMENTS (MANDATORY):
 1. Background MUST be 100% transparent (RGBA with alpha = 0). Canvas size: ${resWidth} x ${resHeight} px.
@@ -627,8 +648,10 @@ ${variationJsonSchemaItems}
       parts.push({ text: promptTemplate });
 
       const candidateModels = (selectedGeminiModel === 'auto'
-        ? ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
-        : [selectedGeminiModel, "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
+        ? (imageDataUrl
+            ? ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+            : ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"])
+        : [selectedGeminiModel, "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
       ).filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
       let rawText = "";

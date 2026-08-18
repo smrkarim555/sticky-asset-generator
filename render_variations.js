@@ -56,7 +56,8 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
     const isParticleScatter = descLower.includes('particle') || descLower.includes('scatter') || descLower.includes('bokeh') || descLower.includes('confetti') || descLower.includes('dust') || descLower.includes('particle_scatter');
     const isAbstractGeo = !isNote && (descLower.includes('abstract_geometric') || descLower.includes('geometric') || descLower.includes('polygon'));
     const isFlare = descLower.includes('flare') || descLower.includes('lens') || descLower.includes('streak') || descLower.includes('anamorphic') || descLower.includes('beam') || descLower.includes('laser') || descLower.includes('glow_streak') || descLower.includes('spark');
-    const isFrame = descLower.includes('frame') || descLower.includes('border') || descLower.includes('certificate') || descLower.includes('diploma');
+    const isSideBanner = descLower.includes('chevron') || descLower.includes('sidebar') || descLower.includes('banner') || (descLower.includes('left') && (descLower.includes('curve') || descLower.includes('ribbon') || descLower.includes('gold') || descLower.includes('green')));
+    const isFrame = !isSideBanner && (descLower.includes('frame') || descLower.includes('border') || descLower.includes('certificate') || descLower.includes('diploma'));
     const isBadge = descLower.includes('badge') || descLower.includes('shield') || descLower.includes('seal') || descLower.includes('medal') || descLower.includes('guarantee');
     const isSpotlight = descLower.includes('spotlight') || descLower.includes('shaft') || descLower.includes('conical');
 
@@ -418,6 +419,104 @@ export function render4KVariations(specs, outputDir, publicDir, assetType = 'aut
         ctx.arc(px, py, pr, 0, Math.PI * 2);
         ctx.fill();
       }
+
+    } else if (isSideBanner) {
+      // =========================================================================
+      // RENDER MODERN LEFT-SIDE CURVED CHEVRON RIBBON CARD BANNER OVERLAY
+      // =========================================================================
+      ctx.save();
+
+      const cornerRadius = 60;
+      const bannerWidth = width * 0.28;
+      const chevronApexX = bannerWidth * 0.95;
+      const chevronInnerX = bannerWidth * 0.25;
+
+      // 1. Base Layer: Deep Rich Background Wave (Green/Navy/Ruby/Black)
+      ctx.beginPath();
+      // Start top-left with rounded corner
+      ctx.moveTo(cornerRadius, 0);
+      // Top edge to curve start
+      ctx.lineTo(bannerWidth * 0.88, 0);
+      // Outer curved wave edge down to bottom
+      ctx.bezierCurveTo(bannerWidth * 0.38, height * 0.42, bannerWidth * 0.42, height * 0.60, bannerWidth * 1.05, height);
+      // Bottom edge to bottom-left corner
+      ctx.lineTo(cornerRadius, height);
+      // Bottom-left rounded corner
+      ctx.arcTo(0, height, 0, height - cornerRadius, cornerRadius);
+      // Left vertical edge up to top-left
+      ctx.lineTo(0, cornerRadius);
+      // Top-left rounded corner
+      ctx.arcTo(0, 0, cornerRadius, 0, cornerRadius);
+      ctx.closePath();
+
+      const baseGrad = ctx.createLinearGradient(0, 0, bannerWidth, height);
+      baseGrad.addColorStop(0, '#003314');
+      baseGrad.addColorStop(0.35, colorDark);
+      baseGrad.addColorStop(0.7, colorMain);
+      baseGrad.addColorStop(1, '#001A0A');
+      ctx.fillStyle = baseGrad;
+      ctx.fill();
+
+      // Subtle ambient specular sheen along the left edge
+      const sheenGrad = ctx.createLinearGradient(0, 0, bannerWidth * 0.5, 0);
+      sheenGrad.addColorStop(0, 'rgba(255,255,255,0.22)');
+      sheenGrad.addColorStop(0.4, 'rgba(255,255,255,0.05)');
+      sheenGrad.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = sheenGrad;
+      ctx.fill();
+
+      // 2. Folded Metallic Gold Chevron Ribbon Layer (< shape slicing through)
+      const ribbonTopY = 0;
+      const ribbonBottomY = height;
+      const ribbonApexY = height * 0.45;
+      const ribbonThickness = bannerWidth * 0.42;
+
+      // Drop shadow underneath the gold chevron band
+      ctx.save();
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+      ctx.shadowBlur = 45;
+      ctx.shadowOffsetX = 15;
+      ctx.shadowOffsetY = 10;
+
+      ctx.beginPath();
+      // Outer edge of the folded chevron ribbon
+      ctx.moveTo(bannerWidth * 0.75, ribbonTopY);
+      ctx.lineTo(chevronInnerX * 0.85, ribbonApexY);
+      ctx.lineTo(bannerWidth * 0.90, ribbonBottomY);
+      // Ribbon inner width
+      ctx.lineTo(bannerWidth * 0.90 - ribbonThickness, ribbonBottomY);
+      ctx.lineTo(chevronInnerX * 0.85 - ribbonThickness, ribbonApexY);
+      ctx.lineTo(bannerWidth * 0.75 - ribbonThickness, ribbonTopY);
+      ctx.closePath();
+
+      // Metallic Glossy Gold Gradient
+      const goldGrad = ctx.createLinearGradient(0, 0, bannerWidth, height);
+      goldGrad.addColorStop(0, '#D4AF37');
+      goldGrad.addColorStop(0.25, '#FFF6D1');
+      goldGrad.addColorStop(0.45, '#F5D77F');
+      goldGrad.addColorStop(0.70, '#B38728');
+      goldGrad.addColorStop(0.88, '#FBF5B7');
+      goldGrad.addColorStop(1, '#AA771C');
+      ctx.fillStyle = goldGrad;
+      ctx.fill();
+      ctx.restore();
+
+      // 3. Crisp Specular Highlights along the Ribbon Edges
+      ctx.beginPath();
+      ctx.moveTo(bannerWidth * 0.75, ribbonTopY);
+      ctx.lineTo(chevronInnerX * 0.85, ribbonApexY);
+      ctx.lineTo(bannerWidth * 0.90, ribbonBottomY);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(bannerWidth * 0.75 - ribbonThickness, ribbonTopY);
+      ctx.lineTo(chevronInnerX * 0.85 - ribbonThickness, ribbonApexY);
+      ctx.lineTo(bannerWidth * 0.90 - ribbonThickness, ribbonBottomY);
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(255, 240, 180, 0.6)';
+      ctx.stroke();
 
       ctx.restore();
 
