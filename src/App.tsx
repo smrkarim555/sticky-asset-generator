@@ -32,7 +32,12 @@ import {
   RefreshCw,
   ExternalLink,
   Activity,
-  Plus
+  Plus,
+  FileText,
+  Upload,
+  Copy,
+  CheckCheck,
+  ListFilter
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SpotlightVariation, BackgroundMode } from './types';
@@ -154,6 +159,174 @@ export default function App() {
   });
 
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
+  const [keyInputMode, setKeyInputMode] = useState<'bulk' | 'single'>('bulk');
+  const [bulkApiInput, setBulkApiInput] = useState<string>('');
+  const [testingAllKeys, setTestingAllKeys] = useState<boolean>(false);
+  const txtFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Helper to extract keys from multi-line text or raw paste
+  const extractKeysFromText = (text: string): Array<{ label: string; key: string }> => {
+    const lines = text.split(/\r?\n/);
+    const parsed: Array<{ label: string; key: string }> = [];
+    const seen = new Set<string>();
+
+    lines.forEach((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+
+      let label = '';
+      let key = '';
+
+      if (trimmed.includes(':') && !trimmed.startsWith('AIzaSy')) {
+        const parts = trimmed.split(':');
+        label = parts[0].trim();
+        key = parts.slice(1).join(':').trim();
+      } else if (trimmed.includes(',') && !trimmed.startsWith('AIzaSy')) {
+        const parts = trimmed.split(',');
+        if (parts[0].trim().startsWith('AIza') || parts[0].trim().length > 30) {
+          key = parts[0].trim();
+          label = parts.slice(1).join(',').trim();
+        } else {
+          label = parts[0].trim();
+          key = parts.slice(1).join(',').trim();
+        }
+      } else {
+        const match = trimmed.match(/AIzaSy[A-Za-z0-9_\-]{33}/) || trimmed.match(/[A-Za-z0-9_\-]{35,50}/);
+        if (match) {
+          key = match[0];
+          label = trimmed.replace(key, '').replace(/[\(\)\[\]#\-:_]/g, ' ').trim();
+        } else if (trimmed.length >= 30 && !trimmed.includes(' ')) {
+          key = trimmed;
+        }
+      }
+
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        parsed.push({
+          label: label || `Key #${storedKeys.length + parsed.length + 1}`,
+          key
+        });
+      }
+    });
+
+    return parsed;
+  };
+
+  const handleImportBulkKeys = () => {
+    if (!bulkApiInput.trim()) {
+      setApiKeyVerifyMsg('Please paste API keys into the box first.');
+      return;
+    }
+
+    const extracted = extractKeysFromText(bulkApiInput);
+    if (extracted.length === 0) {
+      setApiKeyVerifyStatus('invalid');
+      setApiKeyVerifyMsg('❌ No valid Gemini API keys detected. Keys typically start with "AIzaSy..."');
+      return;
+    }
+
+    const existingSet = new Set(storedKeys.map(k => k.key));
+    const newKeys = extracted.filter(k => !existingSet.has(k.key));
+
+    if (newKeys.length === 0) {
+      setApiKeyVerifyStatus('idle');
+      setApiKeyVerifyMsg('⚠️ All pasted API keys are already in your saved list.');
+      return;
+    }
+
+    const updated = [...storedKeys, ...newKeys];
+    setStoredKeys(updated);
+    localStorage.setItem('user_gemini_api_keys', JSON.stringify(updated));
+    localStorage.setItem('user_gemini_api_key', updated[0].key);
+    setActiveKeyIndex(0);
+    localStorage.setItem('user_gemini_active_key_index', '0');
+
+    setBulkApiInput('');
+    setApiKeyVerifyStatus('valid');
+    setApiKeyVerifyMsg(`✅ Successfully imported ${newKeys.length} new API key(s)! (Total: ${updated.length})`);
+  };
+
+  const handleTxtFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      if (text) {
+        setBulkApiInput(text);
+        const extracted = extractKeysFromText(text);
+        if (extracted.length > 0) {
+          setApiKeyVerifyStatus('valid');
+          setApiKeyVerifyMsg(`📁 Loaded ${extracted.length} key(s) from "${file.name}". Click "Save & Import All Keys" to apply.`);
+        }
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleTestSingleKey = async (idx: number) => {
+    if (!storedKeys[idx]) return;
+    const targetKey = storedKeys[idx].key;
+    const targetLabel = storedKeys[idx].label;
+    setApiKeyVerifyStatus('verifying');
+    setApiKeyVerifyMsg(`Testing "${targetLabel}"...`);
+    try {
+      const res = await fetch('/api/verify-api-key', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-gemini-api-key': targetKey,
+          'x-gemini-model': geminiModel
+        },
+        body: JSON.stringify({ apiKey: targetKey, geminiModel })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setApiKeyVerifyStatus('valid');
+        setApiKeyVerifyMsg(`✅ "${targetLabel}" is ONLINE & VALID! (${data.latencyMs}ms)`);
+      } else {
+        setApiKeyVerifyStatus('invalid');
+        setApiKeyVerifyMsg(`❌ "${targetLabel}" Error: ${data.error || 'Failed'}`);
+      }
+    } catch {
+      setApiKeyVerifyStatus('invalid');
+      setApiKeyVerifyMsg(`❌ Network error testing "${targetLabel}"`);
+    }
+  };
+
+  const handleTestAllKeys = async () => {
+    if (storedKeys.length === 0) return;
+    setTestingAllKeys(true);
+    setApiKeyVerifyStatus('verifying');
+    setApiKeyVerifyMsg(`Testing all ${storedKeys.length} API keys...`);
+    let validCount = 0;
+
+    for (let i = 0; i < storedKeys.length; i++) {
+      try {
+        const res = await fetch('/api/verify-api-key', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-gemini-api-key': storedKeys[i].key,
+            'x-gemini-model': geminiModel
+          },
+          body: JSON.stringify({ apiKey: storedKeys[i].key, geminiModel })
+        });
+        const data = await res.json();
+        if (data.success) validCount++;
+      } catch {}
+    }
+
+    setTestingAllKeys(false);
+    if (validCount === storedKeys.length) {
+      setApiKeyVerifyStatus('valid');
+      setApiKeyVerifyMsg(`✅ All ${validCount} API keys are ONLINE and verified!`);
+    } else {
+      setApiKeyVerifyStatus(validCount > 0 ? 'valid' : 'invalid');
+      setApiKeyVerifyMsg(`ℹ️ ${validCount} of ${storedKeys.length} API keys are working.`);
+    }
+  };
   const [showApiKeyText, setShowApiKeyText] = useState<boolean>(false);
   const [apiKeyVerifyStatus, setApiKeyVerifyStatus] = useState<'idle' | 'verifying' | 'valid' | 'invalid'>('idle');
   const [apiKeyVerifyMsg, setApiKeyVerifyMsg] = useState<string | null>(null);
@@ -392,6 +565,7 @@ export default function App() {
           subjectPrompt: finalPrompt,
           imageDataUrl: attachedImage, 
           apiKey: savedApiKey, 
+          allApiKeys: storedKeys.map(k => k.key),
           geminiModel: geminiModel,
           templateMode: promptTemplateMode,
           numVariations: numVariations,
@@ -438,7 +612,8 @@ export default function App() {
         body: JSON.stringify({
           prompt: subjectPrompt,
           imageDataUrl: attachedImage,
-          geminiModel
+          geminiModel,
+          allApiKeys: storedKeys.map(k => k.key)
         })
       });
       const data = await res.json();
@@ -1163,75 +1338,231 @@ export default function App() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="max-w-lg w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative space-y-5"
+              className="max-w-xl w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl relative space-y-4 max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
+              {/* Modal Header */}
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl text-slate-950 font-bold">
+                  <div className="p-2 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-xl text-slate-950 font-bold shadow-md shadow-cyan-500/20">
                     <Key className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="text-base font-bold text-slate-100">Google Gemini API Configuration</h3>
-                    <p className="text-xs text-slate-400">Configure your Gemini API key and AI vision model</p>
+                    <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+                      <span>Gemini API Key Pool</span>
+                      <span className="text-[11px] px-2 py-0.5 bg-cyan-500/15 border border-cyan-500/30 text-cyan-300 rounded-full font-mono">
+                        {storedKeys.length} Key{storedKeys.length !== 1 ? 's' : ''} Loaded
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400">Add multiple keys, bulk paste line-by-line, or import from .txt</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setShowApiKeyModal(false)}
-                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 rounded-lg cursor-pointer"
+                  className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-slate-100 rounded-lg cursor-pointer transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               <div className="space-y-4">
-                {/* Stored Keys List */}
+                {/* Input Mode Selector Tabs */}
+                <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setKeyInputMode('bulk')}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                      keyInputMode === 'bulk'
+                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Bulk Paste & .txt Import</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setKeyInputMode('single')}
+                    className={`flex-1 py-2 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-all ${
+                      keyInputMode === 'single'
+                        ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 font-bold shadow'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Single Key Add</span>
+                  </button>
+                </div>
+
+                {/* Bulk Paste / File Import Form */}
+                {keyInputMode === 'bulk' ? (
+                  <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                        <Copy className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Paste API Keys (Line by Line):</span>
+                      </span>
+
+                      {/* Hidden File Input for TXT / CSV */}
+                      <input
+                        type="file"
+                        ref={txtFileInputRef}
+                        accept=".txt,.csv,.json"
+                        onChange={handleTxtFileUpload}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => txtFileInputRef.current?.click()}
+                        className="px-2.5 py-1 bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 border border-slate-700 rounded-lg text-[11px] font-semibold flex items-center gap-1 cursor-pointer transition-all"
+                      >
+                        <Upload className="w-3 h-3" />
+                        <span>Import .txt File</span>
+                      </button>
+                    </div>
+
+                    <div className="relative">
+                      <textarea
+                        rows={4}
+                        value={bulkApiInput}
+                        onChange={(e) => setBulkApiInput(e.target.value)}
+                        placeholder={`Paste multiple keys here (one key per line):\nAIzaSy...\nAccount2: AIzaSy...\nAIzaSy...`}
+                        className="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl p-3 text-xs text-slate-100 font-mono focus:outline-none resize-none leading-relaxed placeholder:text-slate-600"
+                      />
+                      <div className="absolute right-2.5 bottom-3 text-[10px] font-mono px-2 py-0.5 rounded bg-slate-950/80 border border-slate-800 text-cyan-300">
+                        {extractKeysFromText(bulkApiInput).length} Valid Key(s) Detected
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleImportBulkKeys}
+                      disabled={extractKeysFromText(bulkApiInput).length === 0}
+                      className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer active:scale-98 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <CheckCheck className="w-4 h-4" />
+                      <span>
+                        Save & Auto-Import All {extractKeysFromText(bulkApiInput).length > 0 ? `(${extractKeysFromText(bulkApiInput).length})` : ''} Keys
+                      </span>
+                    </button>
+                  </div>
+                ) : (
+                  /* Single Key Form */
+                  <div className="p-3.5 bg-slate-950/70 rounded-2xl border border-slate-800 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                        <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Add Single Gemini API Key:</span>
+                      </span>
+                      <a
+                        href="https://aistudio.google.com/app/apikey"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1"
+                      >
+                        <span>Get Free Key</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <input
+                        type="text"
+                        value={apiKeyLabelInput}
+                        onChange={(e) => setApiKeyLabelInput(e.target.value)}
+                        placeholder="Label (e.g. Account 1)"
+                        className="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none"
+                      />
+                      <div className="relative sm:col-span-2">
+                        <input
+                          type={showApiKeyText ? "text" : "password"}
+                          value={apiKeyInput}
+                          onChange={(e) => setApiKeyInput(e.target.value)}
+                          placeholder="Paste AIzaSy... key"
+                          className="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none pr-9"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKeyText(!showApiKeyText)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+                        >
+                          {showApiKeyText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleAddApiKey}
+                      className="w-full py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer active:scale-98 transition-all"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Save & Add Key</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Stored Keys Pool List */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                       <Key className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Saved API Keys ({storedKeys.length}):</span>
+                      <span>Saved Keys Pool ({storedKeys.length}):</span>
                     </label>
-                    {storedKeys.length > 0 && (
-                      <button
-                        type="button"
-                        onClick={handleClearAllKeys}
-                        className="text-[11px] text-red-400 hover:text-red-300 hover:underline cursor-pointer"
-                      >
-                        Clear All
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {storedKeys.length > 0 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleTestAllKeys}
+                            disabled={testingAllKeys}
+                            className="text-[11px] text-cyan-400 hover:text-cyan-300 hover:underline cursor-pointer flex items-center gap-1"
+                          >
+                            {testingAllKeys ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Activity className="w-3 h-3" />}
+                            <span>Test All</span>
+                          </button>
+                          <span className="text-slate-700">|</span>
+                          <button
+                            type="button"
+                            onClick={handleClearAllKeys}
+                            className="text-[11px] text-red-400 hover:text-red-300 hover:underline cursor-pointer"
+                          >
+                            Clear All
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {storedKeys.length === 0 ? (
-                    <div className="p-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-400">
-                      No API keys added yet. Add your Gemini API key below.
+                    <div className="p-4 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-400">
+                      No API keys saved yet. Paste keys above or import a .txt file.
                     </div>
                   ) : (
-                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
                       {storedKeys.map((item, idx) => {
                         const isActive = idx === activeKeyIndex;
                         return (
                           <div
                             key={idx}
                             onClick={() => handleSelectActiveKey(idx)}
-                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all ${
+                            className={`p-2 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all ${
                               isActive
-                                ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-100 shadow-sm shadow-cyan-900/20'
+                                ? 'bg-cyan-950/50 border-cyan-500/60 text-cyan-100 shadow-sm shadow-cyan-900/30'
                                 : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
                             }`}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-cyan-400 animate-pulse' : 'bg-slate-600'}`} />
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${isActive ? 'bg-cyan-400 ring-2 ring-cyan-400/40 animate-pulse' : 'bg-slate-600'}`} />
                               <div className="min-w-0">
-                                <p className="text-xs font-bold truncate flex items-center gap-1.5">
-                                  <span>{item.label}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold truncate">{item.label}</span>
                                   {isActive && (
-                                    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.2 bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30">
+                                    <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.2 bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30 font-semibold">
                                       Active
                                     </span>
                                   )}
-                                </p>
+                                </div>
                                 <p className="text-[10px] font-mono text-slate-400 truncate">
                                   {item.key.slice(0, 8)}••••••••{item.key.slice(-4)}
                                 </p>
@@ -1242,9 +1573,20 @@ export default function App() {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
+                                  handleTestSingleKey(idx);
+                                }}
+                                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-cyan-300 rounded-lg text-[10px] font-semibold cursor-pointer transition-colors"
+                                title="Test this key"
+                              >
+                                Test
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
                                   handleDeleteKey(idx);
                                 }}
-                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+                                className="p-1 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
                                 title="Delete this key"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
@@ -1255,60 +1597,6 @@ export default function App() {
                       })}
                     </div>
                   )}
-                </div>
-
-                {/* Add New Key Form */}
-                <div className="p-3.5 bg-slate-950/60 rounded-2xl border border-slate-800 space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-                      <Plus className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Add New Gemini API Key:</span>
-                    </span>
-                    <a
-                      href="https://aistudio.google.com/app/apikey"
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1"
-                    >
-                      <span>Get API Key</span>
-                      <ExternalLink className="w-3 h-3" />
-                    </a>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                    <input
-                      type="text"
-                      value={apiKeyLabelInput}
-                      onChange={(e) => setApiKeyLabelInput(e.target.value)}
-                      placeholder="Label (e.g. Account 1)"
-                      className="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none"
-                    />
-                    <div className="relative sm:col-span-2">
-                      <input
-                        type={showApiKeyText ? "text" : "password"}
-                        value={apiKeyInput}
-                        onChange={(e) => setApiKeyInput(e.target.value)}
-                        placeholder="Paste AIzaSy... key"
-                        className="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none pr-9"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKeyText(!showApiKeyText)}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
-                      >
-                        {showApiKeyText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleAddApiKey}
-                    className="w-full py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer active:scale-98 transition-all"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>Save & Add to Key List</span>
-                  </button>
                 </div>
 
                 {/* Model Selection */}
@@ -1334,7 +1622,7 @@ export default function App() {
                   </select>
                 </div>
 
-                {/* Test & Verification Action for Gemini */}
+                {/* Test Active API Key Action */}
                 <div className="pt-1 flex items-center gap-2">
                   <button
                     type="button"

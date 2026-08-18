@@ -191,7 +191,24 @@ async function startServer() {
     try {
       const { prompt, imageDataUrl, geminiModel } = req.body;
       const customGeminiKey = (req.headers['x-gemini-api-key'] as string) || req.body?.apiKey;
+      const candidateKeys: string[] = Array.isArray(req.body?.allApiKeys) && req.body.allApiKeys.length > 0
+        ? req.body.allApiKeys.filter((k: any) => typeof k === 'string' && k.trim().length > 10)
+        : (customGeminiKey ? [customGeminiKey] : []);
 
+      if (candidateKeys.length === 0) {
+        return res.status(400).json({ success: false, error: "Gemini API key is required to enhance prompt. Please enter your Gemini API key in Settings." });
+      }
+
+      const selectedModel = (geminiModel || "gemini-2.5-flash").trim();
+      const contents: any[] = [];
+      if (imageDataUrl) {
+        const matches = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
+        const mimeType = matches ? matches[1] : "image/png";
+        const base64Data = matches ? matches[2] : imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
+        contents.push({
+          inlineData: { data: base64Data, mimeType }
+        });
+      }
       const systemInstruction = `You are a world-class visual prompt engineer and graphic director.
 Look at the user's input or attached reference image.
 Transform it into an ultra-detailed, commercial-grade 4K vector artwork specification.
@@ -204,37 +221,34 @@ Include:
 
 Return ONLY the enhanced prompt text (no conversational fluff).`;
 
-      const client = getGeminiClient(customGeminiKey);
-      if (!client) {
-        return res.status(400).json({ success: false, error: "Gemini API key is required to enhance prompt. Please enter your Gemini API key in Settings." });
-      }
-      const selectedModel = (geminiModel || "gemini-2.5-flash").trim();
-      const contents: any[] = [];
-      if (imageDataUrl) {
-        const matches = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
-        const mimeType = matches ? matches[1] : "image/png";
-        const base64Data = matches ? matches[2] : imageDataUrl.replace(/^data:image\/\w+;base64,/, "");
-        contents.push({
-          inlineData: { data: base64Data, mimeType }
-        });
-      }
-      contents.push({
-        text: `Enhance this graphic prompt inspired by the subject: "${prompt || "Commercial 4K transparent PNG asset"}"`
-      });
+      let enhancedText = "";
+      let lastErr: any = null;
 
-      const geminiRes = await client.models.generateContent({
-        model: selectedModel,
-        contents,
-        config: {
-          systemInstruction
+      for (const curKey of candidateKeys) {
+        const client = getGeminiClient(curKey);
+        if (!client) continue;
+
+        try {
+          const geminiRes = await client.models.generateContent({
+            model: selectedModel,
+            contents,
+            config: {
+              systemInstruction
+            }
+          });
+          if (geminiRes.text?.trim()) {
+            enhancedText = geminiRes.text.trim();
+            break;
+          }
+        } catch (e: any) {
+          lastErr = e;
         }
-      });
-      const enhancedText = geminiRes.text?.trim() || "";
+      }
 
       if (enhancedText) {
         return res.json({ success: true, enhancedPrompt: enhancedText });
       } else {
-        return res.status(500).json({ success: false, error: "Failed to generate enhanced prompt." });
+        return res.status(500).json({ success: false, error: lastErr?.message || "Failed to generate enhanced prompt." });
       }
     } catch (err: any) {
       console.error("Enhance Prompt Error:", err);
@@ -588,12 +602,15 @@ ${variationJsonSchemaItems}
   ]
 }`;
 
-      const ai = getGeminiClient(customGeminiKey);
-      if (!ai) {
+      const candidateKeys: string[] = Array.isArray(req.body?.allApiKeys) && req.body.allApiKeys.length > 0
+        ? req.body.allApiKeys.filter((k: any) => typeof k === 'string' && k.trim().length > 10)
+        : (customGeminiKey ? [customGeminiKey] : []);
+
+      if (candidateKeys.length === 0) {
         return res.status(400).json({ success: false, error: "Gemini API key is required to generate Python code. Please enter your key in Settings." });
       }
 
-      console.log(`Generating Python 4K PNG script with Gemini (${selectedGeminiModel})...`);
+      console.log(`Generating Python 4K PNG script with Gemini (${selectedGeminiModel}) using ${candidateKeys.length} available API key(s)...`);
 
       let parts: any[] = [];
       if (imageDataUrl && typeof imageDataUrl === "string") {
@@ -617,13 +634,18 @@ ${variationJsonSchemaItems}
       let rawText = "";
       let lastGeminiErr: any = null;
 
-      for (const currentModel of candidateModels) {
-        try {
-          console.log(`Trying Gemini model (${currentModel})...`);
-          const geminiResponse = await ai.models.generateContent({
-            model: currentModel,
-            contents: { parts },
-            config: {
+      keyLoop: for (let kIdx = 0; kIdx < candidateKeys.length; kIdx++) {
+        const curKey = candidateKeys[kIdx];
+        const ai = getGeminiClient(curKey);
+        if (!ai) continue;
+
+        for (const currentModel of candidateModels) {
+          try {
+            console.log(`Trying Gemini key #${kIdx + 1} with model (${currentModel})...`);
+            const geminiResponse = await ai.models.generateContent({
+              model: currentModel,
+              contents: { parts },
+              config: {
               responseMimeType: "application/json",
               responseSchema: {
                 type: Type.OBJECT,
@@ -654,13 +676,14 @@ ${variationJsonSchemaItems}
 
           if (geminiResponse && geminiResponse.text) {
             rawText = geminiResponse.text;
-            break;
+            break keyLoop;
           }
         } catch (modelErr: any) {
           lastGeminiErr = modelErr;
           console.warn(`Gemini model ${currentModel} notice:`, modelErr.message || modelErr);
         }
       }
+    }
 
       if (!rawText) {
         return res.status(500).json({
