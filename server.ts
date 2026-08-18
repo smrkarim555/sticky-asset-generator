@@ -609,15 +609,10 @@ ${variationJsonSchemaItems}
       }
       parts.push({ text: promptTemplate });
 
-      const candidateModels = [
-        selectedGeminiModel,
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-1.5-flash",
-        "gemini-1.5-pro"
-      ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
+      const candidateModels = (selectedGeminiModel === 'auto'
+        ? ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+        : [selectedGeminiModel, "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
+      ).filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
       let rawText = "";
       let lastGeminiErr: any = null;
@@ -680,6 +675,7 @@ ${variationJsonSchemaItems}
         const pyMatch = text.match(/"pythonCode"\s*:\s*"([\s\S]*?)"(?=\s*,\s*"|\s*\}|\s*$)/);
         if (pyMatch && pyMatch[1]) {
           return pyMatch[1]
+            .replace(/\\r\\n/g, "\n")
             .replace(/\\n/g, "\n")
             .replace(/\\"/g, '"')
             .replace(/\\\\/g, "\\");
@@ -733,31 +729,21 @@ ${variationJsonSchemaItems}
       let pythonCodeToSave = generatedData.pythonCode || "";
       pythonCodeToSave = pythonCodeToSave.replace(/^```python\s*/i, "").replace(/^```\s*/i, "").replace(/\s*```$/, "");
 
-      // Bulletproof PyCairo & Graphics Helpers Header
-      const bulletproofHeader = `# Bulletproof PyCairo & Graphics Helpers
+      // Normalize any literal escaped newlines from JSON stringification
+      if (pythonCodeToSave.includes('\\n') && !pythonCodeToSave.includes('\n')) {
+        pythonCodeToSave = pythonCodeToSave
+          .replace(/\\r\\n/g, "\n")
+          .replace(/\\n/g, "\n")
+          .replace(/\\"/g, '"')
+          .replace(/\\\\/g, "\\");
+      }
+
+      // Standalone Graphics Helpers (without mutating C-extension classes)
+      const graphicsHelpers = `# PyCairo & Graphics Standalone Helpers
 import cairo
 import numpy as np
 import math
 
-# 1. Patch cairo.Context to safely handle 5 or 6 argument arc/arc_negative
-_cairo_orig_arc = cairo.Context.arc
-_cairo_orig_arc_negative = cairo.Context.arc_negative
-
-def _safe_cairo_arc(self, xc, yc, radius, angle1, angle2, *args, **kwargs):
-    ccw = kwargs.get('counterclockwise', False)
-    if len(args) > 0 and (args[0] is True or str(args[0]).lower() == 'true'):
-        ccw = True
-    if ccw:
-        return _cairo_orig_arc_negative(self, float(xc), float(yc), float(radius), float(angle1), float(angle2))
-    return _cairo_orig_arc(self, float(xc), float(yc), float(radius), float(angle1), float(angle2))
-
-def _safe_cairo_arc_negative(self, xc, yc, radius, angle1, angle2, *args, **kwargs):
-    return _cairo_orig_arc_negative(self, float(xc), float(yc), float(radius), float(angle1), float(angle2))
-
-cairo.Context.arc = _safe_cairo_arc
-cairo.Context.arc_negative = _safe_cairo_arc_negative
-
-# 2. Quadratic curve and rounded rectangle helpers
 def draw_quad_curve(ctx, qx, qy, endx, endy):
     try:
         x0, y0 = ctx.get_current_point()
@@ -780,16 +766,16 @@ def draw_rounded_rectangle(ctx, x, y, w, h, r):
         ctx.close_path()
     except Exception:
         ctx.rectangle(float(x), float(y), float(w), float(h))
-
-cairo.Context.quadratic_curve_to = draw_quad_curve
-cairo.Context.rounded_rectangle = draw_rounded_rectangle
-cairo.Context.round_rectangle = draw_rounded_rectangle
 `;
 
-      pythonCodeToSave = bulletproofHeader + "\n\n" + pythonCodeToSave.trim() + "\n";
+      pythonCodeToSave = graphicsHelpers + "\n\n" + pythonCodeToSave.trim() + "\n";
 
-      // Auto-replace any hallucinated methods & invalid parameters in PyCairo, OpenCV & Scipy
+      // Robust Auto-Replacements for AI hallucinated methods & 6-arg arc calls
+      pythonCodeToSave = pythonCodeToSave.replace(/([a-zA-Z0-9_]+)\.arc\(\s*([^,\)]+),\s*([^,\)]+),\s*([^,\)]+),\s*([^,\)]+),\s*([^,\)]+),\s*(?:counterclockwise\s*=\s*)?True\s*\)/g, "$1.arc_negative($2, $3, $4, $5, $6)");
+      pythonCodeToSave = pythonCodeToSave.replace(/([a-zA-Z0-9_]+)\.arc\(\s*([^,\)]+),\s*([^,\)]+),\s*([^,\)]+),\s*([^,\)]+),\s*([^,\)]+),\s*(?:counterclockwise\s*=\s*)?False\s*\)/g, "$1.arc($2, $3, $4, $5, $6)");
       pythonCodeToSave = pythonCodeToSave.replace(/([a-zA-Z0-9_]+)\.quadratic_curve_to\(/g, "draw_quad_curve($1, ");
+      pythonCodeToSave = pythonCodeToSave.replace(/([a-zA-Z0-9_]+)\.rounded_rectangle\(/g, "draw_rounded_rectangle($1, ");
+      pythonCodeToSave = pythonCodeToSave.replace(/([a-zA-Z0-9_]+)\.round_rectangle\(/g, "draw_rounded_rectangle($1, ");
       pythonCodeToSave = pythonCodeToSave.replace(/cairo\.Pattern\.create_linear\(/g, "cairo.LinearGradient(");
       pythonCodeToSave = pythonCodeToSave.replace(/cairo\.Pattern\.create_radial\(/g, "cairo.RadialGradient(");
       pythonCodeToSave = pythonCodeToSave.replace(/,\s*borderValue\s*=\s*[^,\)]+/gi, "");
