@@ -138,26 +138,47 @@ async function startServer() {
     const startTime = Date.now();
     try {
       const customKey = (req.headers['x-gemini-api-key'] as string) || req.body?.apiKey;
-      const modelToUse = (req.body?.geminiModel || (req.headers['x-gemini-model'] as string) || "gemini-2.5-flash").trim();
+      const requestedModel = (req.body?.geminiModel || (req.headers['x-gemini-model'] as string) || "gemini-2.5-flash").trim();
       const ai = getGeminiClient(customKey);
       if (!ai) {
         return res.status(400).json({ success: false, error: "No Gemini API key provided or found on server." });
       }
-      const testResult = await ai.models.generateContent({
-        model: modelToUse,
-        contents: "Respond with 'GEMINI_MODEL_ONLINE'",
-      });
+
+      let activeModel = requestedModel;
+      let testResult: any = null;
+      let errorDetails = "";
+
+      const testCandidates = [requestedModel, "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
+
+      for (const m of testCandidates) {
+        try {
+          testResult = await ai.models.generateContent({
+            model: m,
+            contents: "Respond with 'GEMINI_MODEL_ONLINE'",
+          });
+          if (testResult && testResult.text) {
+            activeModel = m;
+            break;
+          }
+        } catch (e: any) {
+          errorDetails = e.message || String(e);
+        }
+      }
+
       const latencyMs = Date.now() - startTime;
       if (testResult && testResult.text) {
+        const msg = activeModel === requestedModel 
+          ? `Gemini model '${activeModel}' is ONLINE & working! (${latencyMs}ms)`
+          : `Gemini API key is VALID & ONLINE via '${activeModel}' (Fallback used) (${latencyMs}ms)`;
         return res.json({ 
           success: true, 
-          message: `Gemini model '${modelToUse}' is ONLINE & working! (${latencyMs}ms)`,
-          model: modelToUse,
+          message: msg,
+          model: activeModel,
           latencyMs,
           reply: testResult.text.trim()
         });
       } else {
-        return res.status(400).json({ success: false, error: "Invalid API response from Gemini.", latencyMs });
+        return res.status(400).json({ success: false, error: errorDetails || "Invalid API response from Gemini.", latencyMs });
       }
     } catch (err: any) {
       console.error("API Key Verification Error:", err);
