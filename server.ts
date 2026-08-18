@@ -15,6 +15,98 @@ async function startServer() {
 
   const imagesDir = path.join(process.cwd(), "spotlight_studio");
   const publicDir = path.join(process.cwd(), "public", "images");
+  const assetsDir = path.join(process.cwd(), "assets");
+  const ASSET_MAX_AGE_MS = 60 * 60 * 1000; // 1 hour (3,600,000 ms)
+
+  // Automatic asset cleanup function: deletes generated folders and files older than 1 hour
+  const cleanupOldAssets = (maxAgeMs: number = ASSET_MAX_AGE_MS) => {
+    try {
+      const now = Date.now();
+      let cleanedCount = 0;
+
+      // 1. Clean subfolders & temporary generated files inside `assets/`
+      if (fs.existsSync(assetsDir)) {
+        const entries = fs.readdirSync(assetsDir);
+        for (const entry of entries) {
+          // Preserve utility scripts (e.g. png_collector) and hidden config files
+          if (entry.startsWith("png_collector") || entry.startsWith(".")) {
+            continue;
+          }
+
+          const entryPath = path.join(assetsDir, entry);
+          try {
+            const stats = fs.statSync(entryPath);
+            const itemTime = Math.max(stats.mtimeMs || 0, stats.birthtimeMs || 0, stats.ctimeMs || 0);
+            const ageMs = now - itemTime;
+
+            if (ageMs >= maxAgeMs) {
+              if (stats.isDirectory()) {
+                fs.rmSync(entryPath, { recursive: true, force: true });
+                console.log(`[Auto-Clean 1h] 🗑️ Deleted expired asset folder: assets/${entry} (Age: ${Math.round(ageMs / 60000)} mins)`);
+                cleanedCount++;
+              } else {
+                fs.rmSync(entryPath, { force: true });
+                console.log(`[Auto-Clean 1h] 🗑️ Deleted expired asset file: assets/${entry} (Age: ${Math.round(ageMs / 60000)} mins)`);
+                cleanedCount++;
+              }
+            }
+          } catch (itemErr) {
+            console.error(`[Auto-Clean 1h] Error checking/removing ${entryPath}:`, itemErr);
+          }
+        }
+      }
+
+      // 2. Clean generated output PNG files in `spotlight_studio/` and `public/images/` older than 1 hour
+      for (const sDir of [imagesDir, publicDir]) {
+        if (fs.existsSync(sDir)) {
+          const files = fs.readdirSync(sDir);
+          for (const file of files) {
+            // Target dynamically generated assets (e.g. python_asset_*, custom theme outputs)
+            if (file.startsWith("python_asset_") || file.includes("_output_v") || file.startsWith("asset_")) {
+              const filePath = path.join(sDir, file);
+              try {
+                const stats = fs.statSync(filePath);
+                const itemTime = Math.max(stats.mtimeMs || 0, stats.birthtimeMs || 0, stats.ctimeMs || 0);
+                const ageMs = now - itemTime;
+
+                if (ageMs >= maxAgeMs) {
+                  fs.rmSync(filePath, { force: true });
+                  console.log(`[Auto-Clean 1h] 🗑️ Deleted expired generated image: ${file} (Age: ${Math.round(ageMs / 60000)} mins)`);
+                  cleanedCount++;
+                }
+              } catch (fileErr) {
+                console.error(`[Auto-Clean 1h] Error checking/removing image ${filePath}:`, fileErr);
+              }
+            }
+          }
+        }
+      }
+
+      if (cleanedCount > 0) {
+        console.log(`[Auto-Clean 1h] ✅ Successfully deleted ${cleanedCount} expired asset files/folders older than 1 hour.`);
+      }
+    } catch (cleanErr) {
+      console.error("[Auto-Clean 1h] Error during asset cleanup:", cleanErr);
+    }
+  };
+
+  // Run cleanup once on server startup
+  cleanupOldAssets();
+
+  // Run periodic cleanup every 5 minutes in background
+  setInterval(() => {
+    cleanupOldAssets();
+  }, 5 * 60 * 1000);
+
+  // Manual cleanup API endpoint
+  app.post("/api/cleanup-assets", (req, res) => {
+    const customAgeMs = req.body?.maxAgeMs !== undefined ? Number(req.body.maxAgeMs) : ASSET_MAX_AGE_MS;
+    cleanupOldAssets(customAgeMs);
+    res.json({
+      success: true,
+      message: `Assets older than ${Math.round(customAgeMs / 60000)} minutes cleaned up.`
+    });
+  });
 
   // Gemini Client Helper
   const getGeminiClient = (customKey?: string) => {
@@ -412,6 +504,9 @@ Return strictly valid JSON:
   // POST endpoint for Programmatic Python Code Generation & 4K PNG Rendering (Pure Gemini)
   app.post("/api/generate-python-asset", async (req, res) => {
     try {
+      // Clean any expired assets older than 1 hour before generating new ones
+      cleanupOldAssets();
+
       const { subjectPrompt, imageDataUrl, geminiModel, numVariations, aspectRatio } = req.body;
       const customGeminiKey = (req.headers['x-gemini-api-key'] as string) || req.body?.apiKey;
       const selectedGeminiModel = (geminiModel || (req.headers['x-gemini-model'] as string) || "gemini-3.7-flash").trim();

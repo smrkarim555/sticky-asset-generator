@@ -31,7 +31,8 @@ import {
   Cpu,
   RefreshCw,
   ExternalLink,
-  Activity
+  Activity,
+  Plus
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SpotlightVariation, BackgroundMode } from './types';
@@ -125,8 +126,30 @@ export default function App() {
   const [aspectRatio, setAspectRatio] = useState<string>(() => localStorage.getItem('user_aspect_ratio') || '16:9');
 
   // Custom User Gemini API Key & Model States (Persisted in localStorage)
-  const [apiKeyInput, setApiKeyInput] = useState<string>(() => localStorage.getItem('user_gemini_api_key') || '');
-  const [savedApiKey, setSavedApiKey] = useState<string>(() => localStorage.getItem('user_gemini_api_key') || '');
+  // Multi-key support: stored as JSON array [{label, key}]
+  const loadStoredKeys = (): Array<{label: string; key: string}> => {
+    try {
+      const raw = localStorage.getItem('user_gemini_api_keys');
+      if (raw) return JSON.parse(raw);
+    } catch {}
+    // Migrate single key to multi-key format
+    const singleKey = localStorage.getItem('user_gemini_api_key');
+    if (singleKey) {
+      const migrated = [{ label: 'Default', key: singleKey }];
+      localStorage.setItem('user_gemini_api_keys', JSON.stringify(migrated));
+      return migrated;
+    }
+    return [];
+  };
+
+  const [storedKeys, setStoredKeys] = useState<Array<{label: string; key: string}>>(loadStoredKeys);
+  const [activeKeyIndex, setActiveKeyIndex] = useState<number>(() => {
+    const idx = Number(localStorage.getItem('user_gemini_active_key_index') || '0');
+    return idx;
+  });
+  const [apiKeyInput, setApiKeyInput] = useState<string>('');
+  const [apiKeyLabelInput, setApiKeyLabelInput] = useState<string>('');
+  const savedApiKey = storedKeys.length > 0 && activeKeyIndex < storedKeys.length ? storedKeys[activeKeyIndex].key : '';
   const [geminiModel, setGeminiModel] = useState<string>(() => localStorage.getItem('user_gemini_model') || 'gemini-3.7-flash');
 
   const [showApiKeyModal, setShowApiKeyModal] = useState<boolean>(false);
@@ -205,27 +228,69 @@ export default function App() {
     }
   };
 
-  const handleSaveApiKey = () => {
+  const handleAddApiKey = () => {
     const key = apiKeyInput.trim();
-    if (key) {
-      localStorage.setItem('user_gemini_api_key', key);
-      setSavedApiKey(key);
-      setApiKeyVerifyStatus('idle');
-      setApiKeyVerifyMsg('Gemini API Key successfully saved in local storage!');
-    } else {
-      localStorage.removeItem('user_gemini_api_key');
-      setSavedApiKey('');
-      setApiKeyVerifyStatus('idle');
-      setApiKeyVerifyMsg('Saved API Key removed.');
+    if (!key) {
+      setApiKeyVerifyMsg('Please enter an API key.');
+      return;
     }
+    const label = apiKeyLabelInput.trim() || `Key ${storedKeys.length + 1}`;
+    // Check for duplicate
+    if (storedKeys.some(k => k.key === key)) {
+      setApiKeyVerifyMsg('This API key is already saved.');
+      return;
+    }
+    const updated = [...storedKeys, { label, key }];
+    setStoredKeys(updated);
+    localStorage.setItem('user_gemini_api_keys', JSON.stringify(updated));
+    // Also keep legacy key in sync for backward compat
+    localStorage.setItem('user_gemini_api_key', key);
+    setActiveKeyIndex(updated.length - 1);
+    localStorage.setItem('user_gemini_active_key_index', String(updated.length - 1));
+    setApiKeyInput('');
+    setApiKeyLabelInput('');
+    setApiKeyVerifyStatus('idle');
+    setApiKeyVerifyMsg(`✅ Key "${label}" added and set as active!`);
   };
 
-  const handleClearApiKey = () => {
-    localStorage.removeItem('user_gemini_api_key');
-    setApiKeyInput('');
-    setSavedApiKey('');
+  const handleSelectActiveKey = (idx: number) => {
+    setActiveKeyIndex(idx);
+    localStorage.setItem('user_gemini_active_key_index', String(idx));
+    localStorage.setItem('user_gemini_api_key', storedKeys[idx].key);
     setApiKeyVerifyStatus('idle');
-    setApiKeyVerifyMsg('Saved API Key cleared.');
+    setApiKeyVerifyMsg(`Switched to "${storedKeys[idx].label}"`);
+  };
+
+  const handleDeleteKey = (idx: number) => {
+    const updated = storedKeys.filter((_, i) => i !== idx);
+    setStoredKeys(updated);
+    localStorage.setItem('user_gemini_api_keys', JSON.stringify(updated));
+    if (updated.length === 0) {
+      localStorage.removeItem('user_gemini_api_key');
+      setActiveKeyIndex(0);
+    } else if (activeKeyIndex >= updated.length) {
+      const newIdx = updated.length - 1;
+      setActiveKeyIndex(newIdx);
+      localStorage.setItem('user_gemini_active_key_index', String(newIdx));
+      localStorage.setItem('user_gemini_api_key', updated[newIdx].key);
+    } else {
+      localStorage.setItem('user_gemini_api_key', updated[activeKeyIndex].key);
+    }
+    localStorage.setItem('user_gemini_active_key_index', String(Math.min(activeKeyIndex, Math.max(0, updated.length - 1))));
+    setApiKeyVerifyStatus('idle');
+    setApiKeyVerifyMsg('Key removed.');
+  };
+
+  const handleClearAllKeys = () => {
+    localStorage.removeItem('user_gemini_api_keys');
+    localStorage.removeItem('user_gemini_api_key');
+    localStorage.removeItem('user_gemini_active_key_index');
+    setStoredKeys([]);
+    setActiveKeyIndex(0);
+    setApiKeyInput('');
+    setApiKeyLabelInput('');
+    setApiKeyVerifyStatus('idle');
+    setApiKeyVerifyMsg('All saved API Keys cleared.');
   };
 
   const handleVerifyApiKey = async () => {
@@ -251,7 +316,6 @@ export default function App() {
       if (data.success) {
         setApiKeyVerifyStatus('valid');
         setApiKeyVerifyMsg(`✅ ${data.message || `Gemini model '${geminiModel}' is verified & working!`}`);
-        setSavedApiKey(keyToTest);
         localStorage.setItem('user_gemini_api_key', keyToTest);
       } else {
         setApiKeyVerifyStatus('invalid');
@@ -533,10 +597,13 @@ export default function App() {
                 <button
                   onClick={() => setShowApiKeyModal(true)}
                   className="flex items-center gap-2 bg-emerald-950/80 border border-emerald-500/40 px-3 py-1.5 rounded-xl text-xs text-emerald-200 hover:bg-emerald-900/80 cursor-pointer"
-                  title="Click to manage saved API key"
+                  title="Click to manage saved API keys"
                 >
                   <Key className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Gemini Key: <strong className="text-white font-mono">{savedApiKey.slice(0, 6)}...{savedApiKey.slice(-4)}</strong></span>
+                  <span>
+                    Gemini Key ({storedKeys[activeKeyIndex]?.label || 'Active'}): <strong className="text-white font-mono">{savedApiKey.slice(0, 6)}...{savedApiKey.slice(-4)}</strong>
+                    {storedKeys.length > 1 && <span className="ml-1 text-[10px] text-emerald-400 font-mono">({storedKeys.length} saved)</span>}
+                  </span>
                 </button>
               ) : (
                 <button
@@ -1117,11 +1184,84 @@ export default function App() {
               </div>
 
               <div className="space-y-4">
+                {/* Stored Keys List */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
-                    <span className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                       <Key className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Gemini API Key:</span>
+                      <span>Saved API Keys ({storedKeys.length}):</span>
+                    </label>
+                    {storedKeys.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearAllKeys}
+                        className="text-[11px] text-red-400 hover:text-red-300 hover:underline cursor-pointer"
+                      >
+                        Clear All
+                      </button>
+                    )}
+                  </div>
+
+                  {storedKeys.length === 0 ? (
+                    <div className="p-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 text-center text-xs text-slate-400">
+                      No API keys added yet. Add your Gemini API key below.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                      {storedKeys.map((item, idx) => {
+                        const isActive = idx === activeKeyIndex;
+                        return (
+                          <div
+                            key={idx}
+                            onClick={() => handleSelectActiveKey(idx)}
+                            className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 cursor-pointer transition-all ${
+                              isActive
+                                ? 'bg-cyan-950/40 border-cyan-500/60 text-cyan-100 shadow-sm shadow-cyan-900/20'
+                                : 'bg-slate-950/60 border-slate-800 text-slate-300 hover:border-slate-700'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${isActive ? 'bg-cyan-400 animate-pulse' : 'bg-slate-600'}`} />
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold truncate flex items-center gap-1.5">
+                                  <span>{item.label}</span>
+                                  {isActive && (
+                                    <span className="text-[10px] uppercase tracking-wider px-1.5 py-0.2 bg-cyan-500/20 text-cyan-300 rounded border border-cyan-500/30">
+                                      Active
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-[10px] font-mono text-slate-400 truncate">
+                                  {item.key.slice(0, 8)}••••••••{item.key.slice(-4)}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteKey(idx);
+                                }}
+                                className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+                                title="Delete this key"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Add New Key Form */}
+                <div className="p-3.5 bg-slate-950/60 rounded-2xl border border-slate-800 space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
+                      <Plus className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Add New Gemini API Key:</span>
                     </span>
                     <a
                       href="https://aistudio.google.com/app/apikey"
@@ -1129,28 +1269,48 @@ export default function App() {
                       rel="noreferrer"
                       className="text-[11px] text-cyan-400 hover:underline flex items-center gap-1"
                     >
-                      <span>Get Key from Google AI Studio</span>
+                      <span>Get API Key</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showApiKeyText ? "text" : "password"}
-                      value={apiKeyInput}
-                      onChange={(e) => setApiKeyInput(e.target.value)}
-                      placeholder="AIzaSy..."
-                      className="w-full bg-slate-950 border border-slate-700 focus:border-cyan-400 rounded-xl px-4 py-2.5 text-xs text-slate-100 font-mono focus:outline-none focus:ring-1 focus:ring-cyan-400/50 pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKeyText(!showApiKeyText)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
-                    >
-                      {showApiKeyText ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
                   </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      value={apiKeyLabelInput}
+                      onChange={(e) => setApiKeyLabelInput(e.target.value)}
+                      placeholder="Label (e.g. Account 1)"
+                      className="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none"
+                    />
+                    <div className="relative sm:col-span-2">
+                      <input
+                        type={showApiKeyText ? "text" : "password"}
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        placeholder="Paste AIzaSy... key"
+                        className="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-slate-100 font-mono focus:outline-none pr-9"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKeyText(!showApiKeyText)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 cursor-pointer"
+                      >
+                        {showApiKeyText ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleAddApiKey}
+                    className="w-full py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md cursor-pointer active:scale-98 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Save & Add to Key List</span>
+                  </button>
                 </div>
 
+                {/* Model Selection */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1.5 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
@@ -1178,7 +1338,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleVerifyApiKey}
-                    disabled={apiKeyVerifyStatus === 'verifying'}
+                    disabled={apiKeyVerifyStatus === 'verifying' || (!apiKeyInput && !savedApiKey)}
                     className="flex-1 py-2.5 px-4 bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-md shadow-cyan-600/20 active:scale-95 transition-all cursor-pointer disabled:opacity-50"
                   >
                     {apiKeyVerifyStatus === 'verifying' ? (
@@ -1189,7 +1349,7 @@ export default function App() {
                     ) : (
                       <>
                         <Activity className="w-3.5 h-3.5" />
-                        <span>Test Gemini Key & Model</span>
+                        <span>Test Active API Key & Model</span>
                       </>
                     )}
                   </button>
@@ -1197,7 +1357,7 @@ export default function App() {
 
                 {/* Status Notice Display */}
                 {apiKeyVerifyMsg && (
-                  <div className={`p-3.5 rounded-xl border text-xs flex items-start gap-2.5 ${
+                  <div className={`p-3 rounded-xl border text-xs flex items-start gap-2.5 ${
                     apiKeyVerifyStatus === 'valid'
                       ? 'bg-emerald-950/70 border-emerald-500/50 text-emerald-200'
                       : apiKeyVerifyStatus === 'invalid'
@@ -1212,30 +1372,6 @@ export default function App() {
                     </div>
                   </div>
                 )}
-
-                {/* Action buttons */}
-                <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800">
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveApiKey}
-                      className="px-5 py-2.5 bg-gradient-to-r from-cyan-400 to-blue-600 hover:from-cyan-300 hover:to-blue-500 text-slate-950 font-bold rounded-xl text-xs flex items-center gap-2 shadow-lg cursor-pointer"
-                    >
-                      <Save className="w-4 h-4" />
-                      <span>Save Key & Settings</span>
-                    </button>
-                  </div>
-
-                  {savedApiKey && (
-                    <button
-                      type="button"
-                      onClick={handleClearApiKey}
-                      className="px-3 py-2 text-slate-400 hover:text-red-400 text-xs font-semibold hover:underline cursor-pointer"
-                    >
-                      Clear Saved Key
-                    </button>
-                  )}
-                </div>
               </div>
             </motion.div>
           </motion.div>

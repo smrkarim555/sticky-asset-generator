@@ -6,3 +6,8 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Temporary generated assets
+assets/*
+!assets/png_collector*.py
+!assets/.gitkeep
