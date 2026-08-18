@@ -559,42 +559,46 @@ Return strictly valid JSON:
 
       const variationJsonSchemaItems = Array.from({ length: count }, (_, i) => `    { "id": "v${i+1}", "name": "Variant ${i+1} Name", "primaryColor": "#HEX", "secondaryColor": "#HEX", "filename": "output_v${i+1}.png", "styleDesc": "Colorway variant ${i+1}" }`).join(",\n");
 
-      const promptTemplate = imageDataUrl ? `ROLE: World-Class Python Computer Vision & Vector Graphics Engineer (PyCairo / Pillow / NumPy / OpenCV).
+      const promptTemplate = imageDataUrl ? `ROLE: Elite Python Vector Graphics & Computer Vision Engineer (PyCairo / Pillow / NumPy / OpenCV).
 
-YOUR PRIMARY MISSION:
-Inspect the attached reference image with extreme visual precision.
-Write a complete, runnable Python script (generate.py) that EXACTLY REPRODUCES the graphic artwork shown in the reference image.
+YOUR MISSION (STRICT PIXEL-PERFECT REPLICATION):
+Look at the attached reference image with utmost attention to detail.
+Write a complete, high-fidelity runnable Python script (generate.py) using PyCairo and NumPy that EXACTLY REPRODUCES the visual artwork, colors, gradients, and geometry shown in the reference image.
 
-CRITICAL VISUAL REPLICATION RULES:
-1. SPATIAL GEOMETRY & EXACT PLACEMENT (CRITICAL):
-   - Pay close attention to WHERE the graphic element is located on the canvas.
-   - If the graphic is positioned ONLY on the LEFT side (e.g. Modern Left-Side Curved Header, Folded Chevron Ribbon, Decorative Sidebar, Wave Banner), draw it ONLY on the LEFT side! DO NOT draw on the right, top-right, bottom-right, or all 4 corners!
-   - If it is a single ribbon/banner/badge/paper, reproduce its exact spatial boundaries, width ratio (e.g. spanning left 30% of canvas), curvature, and folds.
-   - The remaining area (e.g. the entire right 70% of canvas) MUST REMAIN 100% CLEAN & TRANSPARENT (RGBA alpha = 0).
+CRITICAL VISUAL DECONSTRUCTION & FIDELITY RULES:
+1. PRECISE SPATIAL ASYMMETRY & EXACT PLACEMENT:
+   - Identify WHERE the graphic elements are physically located on the canvas.
+   - If the graphic is positioned ONLY on the LEFT side (e.g. Left-Side Curved Header + Folded Chevron Ribbon Arrow), draw it ONLY on the LEFT side!
+   - If the graphic is located on specific corners (e.g. Bottom-Left and Top-Right diagonal corner accents/stripes), draw ONLY on those specific corners! DO NOT draw on corners where the reference is empty!
+   - Respect the transparent/empty cutout: wherever the reference has empty transparent space (checkerboard or blank), leave it 100% TRANSPARENT (RGBA alpha = 0).
 
-2. MULTI-LAYER BEZIER PATHING & SHADING:
-   - Base Layer: Draw the background curved polygon (e.g. deep emerald green '#003816' -> '#005C25') using smooth Bezier curves (ctx.curve_to).
-   - Ribbon / Chevron Layer: Draw the sharp folded chevron / arrow ribbon band with rich metallic glossy gold linear gradients ('#FFF6D1' -> '#D4AF37' -> '#996515' -> '#593A0E') and crisp specular highlight strokes.
-   - Inner Bevel / Shadows: Add subtle darker drop shadow between the overlapping ribbon and background wave.
-   - Rounded corners on the left edge if present in reference.
+2. RICH MULTI-STOP GRADIENTS & METALLIC SHADING (MANDATORY):
+   - NEVER use flat solid colors! Always construct rich directional LinearGradient (cairo.LinearGradient) matching the exact angle of each shape.
+   - For Metallic Glossy Gold: Use 5+ color stops (e.g. '#FFF8D6' bright glint -> '#F5D77F' light gold -> '#D4AF37' rich gold -> '#996515' warm shade -> '#543608' deep crevice).
+   - For Emerald / Forest Green: Use deep lustrous stops (e.g. '#001A0A' deep dark -> '#003816' rich emerald -> '#005C28' midtone -> '#00853B' highlight).
+   - Draw crisp 2-4px specular highlight strokes ('#FFFFFF' with 0.8 alpha) along the outer and fold boundaries of ribbons/shapes.
 
-3. 100% TRANSPARENT CANVAS (MANDATORY):
-   - Canvas resolution: ${resWidth} x ${resHeight} px (RGBA format).
-   - Canvas surface MUST be completely clear/transparent (ctx.set_source_rgba(0,0,0,0); ctx.paint()).
-   - ABSOLUTELY NO outer background boxes, NO grey rectangles, NO canvas-wide vignettes, NO overall drop shadow on the canvas background.
+3. ORGANIC GRAIN & LAYER DEPTH:
+   - Construct shapes in proper Z-order (background polygon -> drop shadow -> glossy overlay ribbon / stripes -> highlight glints).
+   - Call apply_organic_grain(surface, intensity=0.025) on the finished surface for authentic micro-texture.
 
-4. 4K COMMERCIAL COLORWAY VARIATIONS:
+4. 100% TRANSPARENT CANVAS (MANDATORY):
+   - Canvas resolution: ${resWidth} x ${resHeight} px (RGBA).
+   - Canvas surface MUST be completely clear (ctx.set_source_rgba(0, 0, 0, 0); ctx.paint()).
+   - ABSOLUTELY ZERO outer grey boxes, ZERO canvas-wide dark rectangles, ZERO background vignettes.
+
+5. 4K COMMERCIAL COLORWAY VARIATIONS:
    - Generate ${count} distinct commercial colorway variations (output_v1.png to output_v${count}.png) in the current directory:
      * Variant 1: Exact original colorway from the reference (e.g. Emerald Green & Metallic Gold).
      * Variant 2: Royal Sapphire Navy Blue & Champagne Gold.
      * Variant 3: Crimson Ruby Red & Rose Gold.
-     * Variant 4: Luxury Obsidian Black & Platinum Silver / Gold.
-   - Each PNG file size must be uncompressed high-fidelity 4K (2.0 MB to 10.0 MB).
+     * Variant 4: Luxury Obsidian Black & Platinum Gold.
+   - Output PNG file size must be clean uncompressed 4K (2.0 MB to 10.0 MB).
 
 Return strictly valid JSON:
 {
   "projectFolder": "descriptive_folder_name_in_lowercase",
-  "themeName": "Exact Descriptive Title of the Artwork (e.g. Modern Left-Side Chevron Ribbon Banner)",
+  "themeName": "Exact Descriptive Title of the Artwork (e.g. Luxury Left Curve Chevron Banner)",
   "pythonCode": "Complete runnable python code",
   "variations": [
 ${variationJsonSchemaItems}
@@ -602,7 +606,7 @@ ${variationJsonSchemaItems}
 }` : `ROLE
 You are an elite Python computer vision & vector graphics engineer.
 Build a commercial-grade 4K transparent PNG asset script entirely in code using PyCairo, Pillow (PIL), NumPy, and OpenCV.
-Do NOT use AI background-removal or blurry cutouts; construct the exact visual phenomenon programmatically using mathematical paths, Bezier curves, radial/linear gradients, and compositing.
+Do NOT use AI background-removal or blurry cutouts; construct the exact visual phenomenon programmatically using mathematical paths, Bezier curves, multi-stop linear/radial gradients, and compositing.
 
 SUBJECT PROMPT: "${subjectPrompt || "High resolution transparent vector asset"}"
 
@@ -647,11 +651,23 @@ ${variationJsonSchemaItems}
       }
       parts.push({ text: promptTemplate });
 
-      const candidateModels = (selectedGeminiModel === 'auto'
-        ? (imageDataUrl
-            ? ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
-            : ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro"])
-        : [selectedGeminiModel, "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+      // Cleanly resolve model aliases to active Google Gemini endpoints
+      const resolveApiEndpoint = (mName: string): string => {
+        const m = (mName || '').toLowerCase().trim();
+        if (m === 'auto') return imageDataUrl ? 'gemini-2.5-pro' : 'gemini-2.5-flash';
+        if (m.includes('pro')) {
+          if (m.includes('1.5')) return 'gemini-1.5-pro';
+          return 'gemini-2.5-pro';
+        }
+        if (m.includes('2.0')) return 'gemini-2.0-flash';
+        if (m.includes('1.5')) return 'gemini-1.5-flash';
+        return 'gemini-2.5-flash';
+      };
+
+      const requestedEndpoint = resolveApiEndpoint(selectedGeminiModel);
+      const candidateModels = (imageDataUrl
+        ? [requestedEndpoint, "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"]
+        : [requestedEndpoint, "gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-1.5-flash"]
       ).filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
       let rawText = "";
@@ -784,7 +800,7 @@ ${variationJsonSchemaItems}
           .replace(/\\\\/g, "\\");
       }
 
-      // Standalone Graphics Helpers (without mutating C-extension classes)
+      // Standalone Graphics & Texture Helpers
       const graphicsHelpers = `# PyCairo & Graphics Standalone Helpers
 import cairo
 import numpy as np
@@ -812,6 +828,21 @@ def draw_rounded_rectangle(ctx, x, y, w, h, r):
         ctx.close_path()
     except Exception:
         ctx.rectangle(float(x), float(y), float(w), float(h))
+
+def apply_organic_grain(surface, intensity=0.03):
+    try:
+        w = surface.get_width()
+        h = surface.get_height()
+        buf = surface.get_data()
+        arr = np.frombuffer(buf, np.uint8).reshape((h, w, 4))
+        alpha = arr[:, :, 3] > 0
+        noise = np.random.normal(0, intensity * 255, (h, w)).astype(np.int16)
+        for c in range(3):
+            val = arr[:, :, c].astype(np.int16) + noise
+            arr[:, :, c] = np.where(alpha, np.clip(val, 0, 255), 0).astype(np.uint8)
+        surface.mark_dirty()
+    except Exception:
+        pass
 `;
 
       pythonCodeToSave = graphicsHelpers + "\n\n" + pythonCodeToSave.trim() + "\n";
